@@ -116,8 +116,8 @@ AWS_REGION=us-east-1
 S3_BUCKET_NAME=your-pdf-bucket-name
 
 # AI Model APIs
-GEMINI_API_KEY=your_gemini_api_key
-DEEPSEEK_API_KEY=your_deepseek_api_key  # Optional: for evidence extraction
+GEMINI_API_KEY=your_gemini_api_key # for general query
+DEEPSEEK_API_KEY=your_deepseek_api_key  # for evidence extraction
 ```
 
 ### 5. API Keys Setup
