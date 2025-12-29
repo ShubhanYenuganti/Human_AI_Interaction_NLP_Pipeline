@@ -1,4 +1,4 @@
-# Human-AI Interaction NLP Pipeline
+# Human-AI Interaction NLP Pipeline for B. John Garrick Institute for the Risk Sciences.
 
 ## 🚀 Overview
 
