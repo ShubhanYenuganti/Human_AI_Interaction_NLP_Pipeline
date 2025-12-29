@@ -100,9 +100,8 @@ def export_evidence_to_csv(
                     ELSE e.justification_relevance
                 END AS justification,
                 CASE 
-                    WHEN e.validation_status = 'validated' THEN 'y'
-                    WHEN e.validation_status = 'rejected' THEN 'n'
-                    ELSE ''
+                    WHEN e.validation_status = 'valid' THEN 'y'
+                    ELSE 'n'
                 END AS validation
             FROM 
                 extracted_evidence e
