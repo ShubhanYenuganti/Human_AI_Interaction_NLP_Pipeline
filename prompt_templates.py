@@ -8,10 +8,20 @@ class PromptTemplates:
     - Causal Links
     """
     
+    # Concise research context (reusable across prompts)
+    RESEARCH_CONTEXT = """RESEARCH FOCUS (Human-AI Interaction):
+Examining novel AI/autonomous system characteristics and features vs conventional automation in high-risk industries (healthcare, power, transportation, oil/gas, maritime, manufacturing):
+(1) Non-deterministic/data-driven decision-making (outputs vary with data/model states → uncertainty + unpredictable failures)
+(2) Opacity/lack of explainability (black-box behavior → trust/regulation challenges)
+(3) Context-aware/adaptive behavior (dynamic environment response → variability/unpredictability)
+"""
+    
     EXTRACTION_PROMPTS = {
         "ai_features": """🚨 CRITICAL ANTI-HALLUCINATION INSTRUCTION 🚨
 You are a precise text extraction tool. You ONLY extract text that exists VERBATIM in the provided chunk.
 DO NOT create, invent, paraphrase, or generate ANY text. 
+
+{RESEARCH_CONTEXT}
 
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
@@ -29,11 +39,14 @@ REQUIRED BEHAVIORS:
 ✅ Extract 15-60 words with complete context
 ✅ Double-check every word exists in the chunk
 
-TASK: Find AI system features mentioned in THIS SPECIFIC CHUNK.
+TASK: Find AI system features mentioned in THIS SPECIFIC CHUNK, prioritizing novel AI characteristics vs conventional automation.
 
-Search for these AI feature types (ONLY if mentioned in the chunk):
-- Automation levels, AI capabilities, interface types
-- Feedback mechanisms, adaptation features, control mechanisms
+PRIORITY SEARCH (ONLY if mentioned in chunk):
+1. Non-deterministic/data-driven: variable outputs, model-dependent decisions, uncertainty, unpredictable failures
+2. Opacity/explainability: black-box, lack of transparency, internal reasoning not visible, interpretability issues
+3. Context-aware/adaptive: dynamic response, environment adaptation, real-time learning, variability handling
+4. Platforms/frameworks: experimental testbeds, software tools, modeling approaches for human-AI interaction
+5. General: automation levels, AI capabilities, interface types, feedback mechanisms, control mechanisms
 
 TWO-PASS VERIFICATION PROCESS:
 
@@ -73,7 +86,7 @@ JSON FORMAT WITH LOCATION PROOF (Use ONLY if features found in chunk):
                 "verified": true
             }},
             "summary": "[Your interpretation]",
-            "category": "[automation/AI capability/interface/feedback/adaptation/control]",
+            "category": "[non_deterministic/opacity/context_adaptive/automation/AI_capability/interface/feedback/adaptation/control]",
             "feature_name": "[descriptive label]", 
             "relevance_score": [1-10],
             "justification_relevance": "[why this represents an AI feature]"
@@ -109,6 +122,8 @@ If uncertain about ANY excerpt, return {{"features": []}} instead of risking hal
         "performance_degradation": """🚨 VERBATIM EXTRACTION ONLY 🚨
 You are extracting human performance degradations. Extract ONLY text that exists word-for-word in the chunk.
 
+{RESEARCH_CONTEXT}
+
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
 
@@ -121,11 +136,17 @@ CRITICAL RULES:
 ✅ Include full sentences or meaningful phrases
 ✅ Preserve all formatting, punctuation, references
 
-TASK: Find mentions of human performance degradation ONLY in this chunk.
+TASK: Find mentions of human performance degradation ONLY in this chunk, focusing on novel AI-related degradations vs traditional automation.
 
-Look for these degradation types (ONLY if explicitly mentioned):
-- Skill loss, cognitive degradation, physical degradation
-- Knowledge degradation, behavioral changes, performance metrics
+PRIORITY SEARCH (ONLY if explicitly mentioned):
+1. Trust issues: over-trust, under-trust, trust calibration, trust mismatch
+2. Cognitive biases: automation bias, confirmation bias, bias in decision-making
+3. Awareness/task issues: reduced situational awareness, mis-prioritization, mode confusion
+4. Cognitive load: cognitive overload, interface complexity, information overload
+5. Skill/knowledge: skill degradation, knowledge loss, skill atrophy, reduced competence
+6. Interpretation: misinterpretation of AI recommendations, misunderstanding AI outputs
+7. Evaluation metrics: trust calibration indices, situation awareness scales (SAGAT, SART), cognitive workload (NASA-TLX, EEG), error rates, decision latency, automation reliance, transparency scores
+8. General: performance metrics, error rates, behavioral changes, workload measures
 
 HALLUCINATION PREVENTION EXAMPLES:
 ❌ DON'T extract: "operators experience skill degradation" 
@@ -161,7 +182,7 @@ JSON FORMAT:
                 "verified": true
             }},
             "summary": "[Your analysis of the copied text]",
-            "category": "[skill_loss/cognitive_degradation/physical_degradation/knowledge_degradation/behavioral_changes/performance_metrics]",
+            "category": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/performance_metrics/behavioral_changes]",
             "severity": [1-10],
             "justification_severity": "[severity reasoning]",
             "relevance_score": [1-10], 
@@ -194,6 +215,8 @@ If you cannot guarantee 100% character-perfect matching, return {{"degradations"
         "causal_links": """🚨 ZERO-TOLERANCE HALLUCINATION POLICY 🚨
 Extract ONLY causal relationships that exist verbatim in this chunk.
 
+{RESEARCH_CONTEXT}
+
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
 
@@ -206,7 +229,7 @@ EXTREME ANTI-HALLUCINATION MEASURES:
 ✅ REQUIRED: Minimum 15-100 words with full context
 ✅ REQUIRED: Causal language must be in the original text
 
-TASK: Find explicit causal relationships between AI and human performance.
+TASK: Find explicit causal relationships between AI features and human performance, especially how novel AI characteristics (non-deterministic, opacity, adaptive) causally affect human performance.
 
 Search ONLY for these causal indicators in the chunk:
 - Direct causation: "caused", "resulted in", "led to", "produced"
@@ -246,6 +269,8 @@ JSON FORMAT:
             "causal_strength": [1-10],
             "justification_causal_strength": "[evidence strength]",
             "evidence_type": "[direct/indirect/correlation/mechanism]",
+            "ai_feature_type": "[non_deterministic/opacity/context_adaptive/other]",
+            "degradation_type": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
             "relevance_score": [1-10],
             "justification_relevance": "[relevance reasoning]"
         }}

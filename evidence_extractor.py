@@ -46,7 +46,10 @@ class EvidenceExtractor:
             Dictionary containing the extracted evidence
         """
         
-        prompt = self.prompts.EXTRACTION_PROMPTS[prompt_type].format(chunk_text=chunk_text)
+        prompt = self.prompts.EXTRACTION_PROMPTS[prompt_type].format(
+            RESEARCH_CONTEXT=self.prompts.RESEARCH_CONTEXT,
+            chunk_text=chunk_text
+        )
                 
         try: 
             response = self.client.chat.completions.create(
