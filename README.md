@@ -1,48 +1,51 @@
 # Human-AI Interaction NLP Pipeline for B. John Garrick Institute for the Risk Sciences.
 
-## 🚀 Overview
+**B. John Garrick Institute for the Risk Sciences**
 
-This is a comprehensive **Retrieval-Augmented Generation (RAG) system** designed for intelligent document processing and question-answering. The pipeline processes PDF documents from AWS S3, performs semantic chunking, generates vector embeddings, and provides an AI-powered query interface using Google Gemini and DeepSeek models.
+## 🎯 Overview
+
+An automated evidence extraction and validation system designed to identify and analyze research evidence from research documents about human-AI interaction. The pipeline leverages DeepSeek AI to extract evidence across three critical research domains: AI features, performance degradation, and causal links.
 
 ### 🏗️ Architecture
 
-The system consists of several interconnected components:
-
 ```
-📁 S3 Bucket (PDFs) → 📄 PDF Processing → 🔄 Semantic Chunking → 🧠 Vector Embeddings → 💾 PostgreSQL (pgvector) → 🤖 RAG Query System
+📁 S3 Bucket (PDFs) → 📄 PDF Processing → 🔄 Semantic Chunking → 🧠 Vector Embeddings → 💾 PostgreSQL (pgvector) → 🤖 Evidence Extraction & Validation (DeepSeek)
 ```
 
-### 🎯 Key Features
+### 🎯 Primary Research Goals
 
-- **PDF Processing Pipeline**: Automated extraction and processing of PDFs from S3
-- **Hybrid Semantic Chunking**: Intelligent text segmentation using embedding-based similarity
-- **Vector Search**: Fast similarity search using PostgreSQL with pgvector extension
-- **Multi-Model AI Integration**: Support for Google Gemini and DeepSeek models
-- **Evidence Extraction & Validation**: Advanced evidence extraction with validation mechanisms
-- **Interactive Query Interface**: Terminal-based interactive mode for real-time Q&A
-- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+1. **AI Features**: Identify and document AI system features and characteristics in human-AI interaction contexts
+2. **Performance Degradation**: Extract evidence of performance issues, degradation patterns, and failure modes
+3. **Causal Links**: Capture causal relationships between AI features and observed outcomes in human behavior
 
 ## 🛠️ Components
 
-### Core Modules
+### Evidence Extraction Modules
 
-- **`pipeline.py`**: Main PDF processing pipeline
-- **`gemini.py`**: RAG system with Google Gemini integration
+- **`evidence_extract_pipeline.py`**: **[PRIMARY]** End-to-end evidence extraction pipeline
+- **`evidence_extractor.py`**: Core evidence extraction logic using DeepSeek AI
+- **`evidence_validator.py`**: Evidence validation and quality assessment
+- **`prompt_templates.py`**: Structured prompts for evidence extraction tasks
+
+### Supporting Infrastructure
+
+- **`pipeline.py`**: PDF processing and embedding generation pipeline
 - **`read_files.py`**: S3 PDF reader and text extraction
 - **`chunk.py`**: Hybrid semantic text chunking
 - **`vector.py`**: Vector embedding generation using sentence-transformers
 - **`db_writer.py`**: PostgreSQL database operations with pgvector
-- **`evidence_extractor.py`**: Evidence extraction using DeepSeek
-- **`evidence_validator.py`**: Evidence validation and quality assessment
-- **`evidence_extract_pipeline.py`**: End-to-end evidence extraction pipeline
+
+### Optional Query Interface
+
+- **`gemini.py`**: RAG-based query system with Google Gemini (for exploratory analysis)
 
 ## 📋 Prerequisites
 
 - **Python 3.8+**
 - **PostgreSQL 12+** with **pgvector extension**
 - **AWS Account** with S3 access
-- **Google Gemini API** access (for general querying)
-- **DeepSeek API** access (for evidence extraction)
+- **DeepSeek API** access (**required** for evidence extraction)
+- **Google Gemini API** access (optional - only for exploratory querying)
 
 ## 🔧 Installation
 
@@ -94,7 +97,7 @@ GRANT ALL ON SCHEMA public TO nlp_user;
 
 ```bash
 # Run the provided SQL schema
-psql -U nlp_user -d nlp_pipeline -f db1226.sql
+psql -U nlp_user -d nlp_pipeline -f db.sql
 ```
 
 ### 4. Environment Configuration
@@ -122,115 +125,80 @@ DEEPSEEK_API_KEY=your_deepseek_api_key  # for evidence extraction
 
 ### 5. API Keys Setup
 
-#### Google Gemini API
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Create a new API key
-3. Add it to your `.env` file as `GEMINI_API_KEY`
-
-#### DeepSeek API (Optional)
+#### DeepSeek API (**Required**)
 1. Visit [DeepSeek Platform](https://platform.deepseek.com/)
 2. Create an account and generate an API key
 3. Add it to your `.env` file as `DEEPSEEK_API_KEY`
 
+#### Google Gemini API (Optional)
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key
+3. Add it to your `.env` file as `GEMINI_API_KEY`
+
 #### AWS S3 Setup
 1. Create an AWS account and S3 bucket
-2. Create IAM user with S3 read permissions
-3. Add credentials to `.env` file
+2. Upload your research PDF documents into the bucket
+3. Create IAM user with S3 read permissions
+4. Add credentials to `.env` file
 
 ## 🚀 Usage
 
-### 1. PDF Processing Pipeline
+### Quick Start: Evidence Extraction
 
-Process all PDFs in your S3 bucket:
+#### 1. Process PDFs and Generate Embeddings
+
+First, process your PDF documents from S3 to create vector embeddings:
 
 ```bash
 python pipeline.py
 ```
 
-### 2. RAG Query System
+This will:
+- Download PDFs from your configured S3 bucket and store vector embeddings and metadata into the database
 
-#### Interactive Mode
+#### 2. Run Evidence Extraction Pipeline
 
-```bash
-python gemini.py
-```
-
-This starts an interactive terminal where you can ask questions:
-
-```
-❓ Your question: What are the main findings about climate change?
-```
-
-### 3. Evidence Extraction Pipeline
+Extract and validate evidence across all three research domains:
 
 ```bash
 python evidence_extract_pipeline.py
 ```
 
-## 📊 Database Schema
+The pipeline will:
+- Analyze all processed document chunks
+- Extract evidence for each research goal:
+  - **AI Features**: System characteristics and capabilities
+  - **Performance Degradation**: Issues and failure patterns
+  - **Causal Links**: Relationships between features and outcomes
+- Validate extracted evidence with confidence scoring
+- Store results in the `extracted_evidence` table
 
-The system uses four main tables:
+#### 3. Review Extracted Evidence
 
-- **`documents`**: Stores PDF metadata and processing status
-- **`chunks`**: Contains text chunks with embeddings
-- **`queries`**: Logs user queries and responses
-- **`extracted_evidence`**: Stores extracted evidence with validation scores
+Query the database to review extracted evidence:
 
-## ⚙️ Configuration Options
+```sql
+-- View recent evidence extractions
+SELECT excerpt_type, excerpt, relevance_score, validation_confidence
+FROM extracted_evidence
+ORDER BY created_at DESC
+LIMIT 10;
 
-### Chunking Parameters
+-- View evidence by type
+SELECT COUNT(*), excerpt_type
+FROM extracted_evidence
+GROUP BY excerpt_type;
+```
 
-- `target_chunk_size`: Target sentences per chunk (default: 8)
-- `min_chunk_size`: Minimum sentences per chunk (default: 2)
-- `max_chunk_size`: Maximum sentences per chunk (default: 16)
+### Optional: Exploratory Query Interface
 
-### Embedding Models
+For ad-hoc questions about your documents (requires Gemini API):
 
-- Default: `sentence-transformers/all-MiniLM-L6-v2`
-- Other options: `all-mpnet-base-v2`, `multi-qa-mpnet-base-dot-v1`
+```bash
+python gemini.py
+```
 
-### Device Selection
-
-- `cpu`: CPU processing (default)
-- `cuda`: GPU acceleration with NVIDIA CUDA
-- `mps`: Apple Silicon GPU acceleration
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **pgvector Extension Error**
-   ```bash
-   # Ensure pgvector is properly installed
-   sudo apt-get install postgresql-16-pgvector
-   ```
-
-2. **CUDA Out of Memory**
-   ```python
-   # Reduce batch size or use CPU
-   pipeline = PDFProcessingPipeline(batch_size=8, device="cpu")
-   ```
-
-3. **S3 Access Denied**
-   - Verify AWS credentials in `.env`
-   - Ensure S3 bucket permissions allow read access
-
-4. **Database Connection Issues**
-   ```bash
-   # Test database connection
-   psql -U nlp_user -d nlp_pipeline -h localhost
-   ```
-
-### Performance Optimization
-
-- Use GPU acceleration for faster embedding generation
-- Adjust `batch_size` based on available memory
-- Consider using larger embedding models for better accuracy
-- Monitor PostgreSQL performance with appropriate indexing
-
-## 📈 Monitoring and Logs
-
-The system provides comprehensive logging:
+Interactive terminal for real-time Q&A with your document corpus.omprehensive logging:
 - Pipeline processing status
 - Database operations
 - API calls and responses
