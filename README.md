@@ -1,7 +1,5 @@
 # Human-AI Interaction NLP Pipeline for B. John Garrick Institute for the Risk Sciences.
 
-**B. John Garrick Institute for the Risk Sciences**
-
 ## 🎯 Overview
 
 An automated evidence extraction and validation system designed to identify and analyze research evidence from research documents about human-AI interaction. The pipeline leverages DeepSeek AI to extract evidence across three critical research domains: AI features, performance degradation, and causal links.
