@@ -20,8 +20,8 @@ class EmbeddingSemanticChunker:
     def __init__(self, 
                  model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
                  similarity_threshold: float = 0.5,
-                 min_chunk_size: int = 2,
-                 max_chunk_size: int = 16,
+                 min_chunk_size: int = 4,
+                 max_chunk_size: int = 24,
                  device: str = "cpu"
                  ):
         """
@@ -177,9 +177,9 @@ class HybridSemanticChunker:
     """
     
     def __init__(self, 
-                 target_chunk_size: int = 8, # Target sentences per chunk
-                 min_chunk_size: int  = 2, # Minimum sentences per chunk
-                 max_chunk_size: int = 16, # Maximum sentences per chunk
+                 target_chunk_size: int = 14, # Target sentences per chunk
+                 min_chunk_size: int  = 4, # Minimum sentences per chunk
+                 max_chunk_size: int = 24, # Maximum sentences per chunk
                  device: str = "cpu"
                  ):
         """

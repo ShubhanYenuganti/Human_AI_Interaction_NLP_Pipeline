@@ -1086,6 +1086,8 @@ class DatabaseWriter:
             'summary': item.get('summary', ''),
             'relevance_score': item.get('relevance_score', 5),
             'justification_relevance': item.get('justification_relevance', ''),
+            'domain': item.get('domain', ''),
+            'explanation': item.get('explanation', ''),
             'metadata': {
                 'quote': item.get('quote', ''),  # Character-by-character exact copy stored in metadata
             }
@@ -1192,14 +1194,16 @@ class DatabaseWriter:
                                 excerpt_type,
                                 excerpt,
                                 summary,
+                                explanation,
                                 relevance_score,
                                 justification_relevance,
+                                domain,
                                 validation_status,
                                 validation_method,
                                 validation_confidence,
                                 metadata
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """
                         
@@ -1219,8 +1223,10 @@ class DatabaseWriter:
                             normalized_item['excerpt_type'],
                             normalized_item['excerpt'],
                             normalized_item['summary'],
+                            normalized_item['explanation'],
                             normalized_item['relevance_score'],
                             normalized_item['justification_relevance'],
+                            normalized_item['domain'],
                             validation_status,
                             validation_method,
                             validation_confidence,

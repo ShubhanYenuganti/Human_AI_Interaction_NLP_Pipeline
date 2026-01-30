@@ -74,25 +74,8 @@ EXAMPLES OF FORBIDDEN EXTRACTION:
 ❌ "automated decision making" (if chunk says "autonomous decision-making")
 
 JSON FORMAT WITH LOCATION PROOF (Use ONLY if features found in chunk):
-{{
-    "features": [
-        {{
-            "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
-            "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
-            "location_proof": {{
-                "starts_with": "[first 4 words of quote]",
-                "ends_with": "[last 4 words of quote]", 
-                "position": "[beginning/middle/end of chunk]",
-                "verified": true
-            }},
-            "summary": "[Your interpretation]",
-            "category": "[non_deterministic/opacity/context_adaptive/automation/AI_capability/interface/feedback/adaptation/control]",
-            "feature_name": "[descriptive label]", 
-            "relevance_score": [1-10],
-            "justification_relevance": "[why this represents an AI feature]"
-        }}
-    ]
-}}
+
+
 
 CRITICAL: TWO EXTRACTION FIELDS REQUIRED:
 - "quote": Copy EVERY character exactly as it appears in the chunk (spaces, punctuation, formatting)
@@ -186,7 +169,9 @@ JSON FORMAT:
             "severity": [1-10],
             "justification_severity": "[severity reasoning]",
             "relevance_score": [1-10], 
-            "justification_relevance": "[relevance reasoning]"
+            "justification_relevance": "[relevance reasoning]",
+            "explanation": "[2-4 sentence explanation: (1) What specific human performance degradation is described in the excerpt? (2) How does it relate to AI systems, particularly novel characteristics (non-deterministic, opacity, adaptive)? (3) What are the safety or operational implications in the specific domain? Base your explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge, examples, or paraphrases not in the original text]",
+            "domain": "[domain of the degradation] (e.g., nuclear energy, oil & gas, transportation, maritime, offshore, construction, etc.)"
         }}
     ]
 }}
@@ -272,7 +257,9 @@ JSON FORMAT:
             "ai_feature_type": "[non_deterministic/opacity/context_adaptive/other]",
             "degradation_type": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
             "relevance_score": [1-10],
-            "justification_relevance": "[relevance reasoning]"
+            "justification_relevance": "[relevance reasoning]",
+            "explanation": "[2-4 sentence explanation: (1) What is the causal mechanism described in the excerpt (how does the AI feature cause the performance effect)? (2) Is this causation related to novel AI characteristics (non-deterministic, opacity, adaptive) vs traditional automation? (3) What are the theoretical or practical implications of this causal relationship? Base your explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge, examples, or paraphrases not in the original text]",
+            "domain": "[domain of the causal link] (e.g., nuclear energy, oil & gas, transportation, maritime, offshore, construction, etc.)"
         }}
     ]
 }}
