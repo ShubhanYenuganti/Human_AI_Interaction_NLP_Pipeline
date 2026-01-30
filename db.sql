@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8mJ5fQ154wWn2wbziNgyUH64nOXbaZyyoLu0sRpWdfOT8AlyyOpBpQzHBqc2khM
+\restrict UBqvextmpgSYaqGacFfsnxFkDK7QMHyQKMsHsdiwG1lh5b3m0aJLb5mbwlLwT6w
 
 -- Dumped from database version 17.5
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -19,38 +19,6 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY public.extracted_evidence DROP CONSTRAINT IF EXISTS extracted_evidence_document_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.extracted_evidence DROP CONSTRAINT IF EXISTS extracted_evidence_chunk_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.chunks DROP CONSTRAINT IF EXISTS chunks_document_id_fkey;
-DROP INDEX IF EXISTS public.idx_documents_upload_date;
-DROP INDEX IF EXISTS public.idx_documents_status;
-DROP INDEX IF EXISTS public.idx_documents_s3_key;
-DROP INDEX IF EXISTS public.idx_documents_metadata;
-DROP INDEX IF EXISTS public.idx_chunks_word_count;
-DROP INDEX IF EXISTS public.idx_chunks_section_title;
-DROP INDEX IF EXISTS public.idx_chunks_embedding;
-DROP INDEX IF EXISTS public.idx_chunks_document_id;
-ALTER TABLE IF EXISTS ONLY public.chunks DROP CONSTRAINT IF EXISTS unique_chunk_per_doc;
-ALTER TABLE IF EXISTS ONLY public.queries DROP CONSTRAINT IF EXISTS queries_pkey;
-ALTER TABLE IF EXISTS ONLY public.extracted_evidence DROP CONSTRAINT IF EXISTS extracted_evidence_pkey;
-ALTER TABLE IF EXISTS ONLY public.extracted_evidence DROP CONSTRAINT IF EXISTS extracted_evidence_chunk_id_document_id_excerpt_type_excerp_key;
-ALTER TABLE IF EXISTS ONLY public.documents DROP CONSTRAINT IF EXISTS documents_s3_key_key;
-ALTER TABLE IF EXISTS ONLY public.documents DROP CONSTRAINT IF EXISTS documents_pkey;
-ALTER TABLE IF EXISTS ONLY public.documents DROP CONSTRAINT IF EXISTS documents_file_hash_key;
-ALTER TABLE IF EXISTS ONLY public.chunks DROP CONSTRAINT IF EXISTS chunks_pkey;
-ALTER TABLE IF EXISTS public.queries ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.extracted_evidence ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.documents ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.chunks ALTER COLUMN id DROP DEFAULT;
-DROP SEQUENCE IF EXISTS public.queries_id_seq;
-DROP TABLE IF EXISTS public.queries;
-DROP SEQUENCE IF EXISTS public.extracted_evidence_id_seq;
-DROP TABLE IF EXISTS public.extracted_evidence;
-DROP SEQUENCE IF EXISTS public.documents_id_seq;
-DROP TABLE IF EXISTS public.documents;
-DROP SEQUENCE IF EXISTS public.chunks_id_seq;
-DROP TABLE IF EXISTS public.chunks;
-DROP EXTENSION IF EXISTS vector;
 --
 -- Name: vector; Type: EXTENSION; Schema: -; Owner: -
 --
@@ -59,7 +27,7 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: -
 --
 
 COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
@@ -70,7 +38,7 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: chunks; Type: TABLE; Schema: public; Owner: postgres
+-- Name: chunks; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.chunks (
@@ -89,10 +57,8 @@ CREATE TABLE public.chunks (
 );
 
 
-ALTER TABLE public.chunks OWNER TO postgres;
-
 --
--- Name: chunks_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: chunks_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.chunks_id_seq
@@ -104,17 +70,26 @@ CREATE SEQUENCE public.chunks_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.chunks_id_seq OWNER TO postgres;
-
 --
--- Name: chunks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: chunks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.chunks_id_seq OWNED BY public.chunks.id;
 
 
 --
--- Name: documents; Type: TABLE; Schema: public; Owner: postgres
+-- Name: counts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.counts (
+    excerpt_type text NOT NULL,
+    total_count integer NOT NULL,
+    category_counts jsonb DEFAULT '{}'::jsonb
+);
+
+
+--
+-- Name: documents; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.documents (
@@ -136,10 +111,8 @@ CREATE TABLE public.documents (
 );
 
 
-ALTER TABLE public.documents OWNER TO postgres;
-
 --
--- Name: documents_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: documents_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.documents_id_seq
@@ -151,17 +124,15 @@ CREATE SEQUENCE public.documents_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.documents_id_seq OWNER TO postgres;
-
 --
--- Name: documents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: documents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.documents_id_seq OWNED BY public.documents.id;
 
 
 --
--- Name: extracted_evidence; Type: TABLE; Schema: public; Owner: postgres
+-- Name: extracted_evidence; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.extracted_evidence (
@@ -186,10 +157,8 @@ CREATE TABLE public.extracted_evidence (
 );
 
 
-ALTER TABLE public.extracted_evidence OWNER TO postgres;
-
 --
--- Name: extracted_evidence_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: extracted_evidence_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.extracted_evidence_id_seq
@@ -201,17 +170,15 @@ CREATE SEQUENCE public.extracted_evidence_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.extracted_evidence_id_seq OWNER TO postgres;
-
 --
--- Name: extracted_evidence_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: extracted_evidence_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.extracted_evidence_id_seq OWNED BY public.extracted_evidence.id;
 
 
 --
--- Name: queries; Type: TABLE; Schema: public; Owner: postgres
+-- Name: queries; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.queries (
@@ -242,10 +209,8 @@ CREATE TABLE public.queries (
 );
 
 
-ALTER TABLE public.queries OWNER TO postgres;
-
 --
--- Name: queries_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: queries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.queries_id_seq
@@ -257,45 +222,43 @@ CREATE SEQUENCE public.queries_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.queries_id_seq OWNER TO postgres;
-
 --
--- Name: queries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: queries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.queries_id_seq OWNED BY public.queries.id;
 
 
 --
--- Name: chunks id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: chunks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.chunks ALTER COLUMN id SET DEFAULT nextval('public.chunks_id_seq'::regclass);
 
 
 --
--- Name: documents id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: documents id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.documents ALTER COLUMN id SET DEFAULT nextval('public.documents_id_seq'::regclass);
 
 
 --
--- Name: extracted_evidence id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: extracted_evidence id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.extracted_evidence ALTER COLUMN id SET DEFAULT nextval('public.extracted_evidence_id_seq'::regclass);
 
 
 --
--- Name: queries id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: queries id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.queries ALTER COLUMN id SET DEFAULT nextval('public.queries_id_seq'::regclass);
 
 
 --
--- Data for Name: chunks; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: chunks; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.chunks (id, document_id, chunk_id, text, section_title, word_count, sentence_count, char_start, char_end, metadata, embedding, created_at) FROM stdin;
@@ -1960,7 +1923,18 @@ COPY public.chunks (id, document_id, chunk_id, text, section_title, word_count, 
 
 
 --
--- Data for Name: documents; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: counts; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.counts (excerpt_type, total_count, category_counts) FROM stdin;
+ai_features	971	{"control": 28, "opacity": 153, "feedback": 17, "interface": 44, "adaptation": 33, "automation": 67, "AI_capability": 446, "context_adaptive": 119, "non_deterministic": 61, "platforms/frameworks": 3}
+causal_links	215	{"AI outputs": 1, "automation": 5, "AI autonomy": 1, "explanations": 1, "transparency": 1, "AI suggestions": 2, "Not applicable": 1, "explainable AI": 2, "AI implementation": 1, "automated systems": 1, "AI recommendations": 1, "agent transparency": 1, "reflective process": 1, "AI-generated advice": 1, "technology advances": 2, "IA querying behavior": 1, "adaptable automation": 1, "algorithmic solution": 2, "errors in one domain": 1, "minimal explanations": 1, "reflective questions": 4, "textual explanations": 2, "automation technology": 1, "misdiagnosis by an AI": 1, "provision of feedback": 1, "AI influence over time": 1, "addition of automation": 1, "explanation mechanisms": 1, "AI presentation methods": 1, "CLs (confidence levels)": 1, "automation transparency": 1, "confidence levels (CLs)": 2, "opacity of AI reasoning": 1, "AI CLs (C3) with low EIL": 1, "AI-driven questions (C5)": 2, "Attention-Directing CFFs": 1, "Decision-Constraint CFFs": 1, "automation tipping point": 1, "electronic flight strips": 1, "AI confidence levels (CL)": 1, "Complexity-Reduction CFFs": 1, "Textual Explanations (C1)": 1, "context-aware ADAS system": 1, "deception detection tasks": 1, "integration of automation": 1, "Explanatory visualizations": 1, "AI taking an executive role": 1, "AI’s reflective questions": 1, "IA's advice or consultation": 1, "advanced autonomous systems": 1, "decision support mechanisms": 1, "example-based presentations": 2, "human oversight RL approach": 1, "lack of system transparency": 1, "over-reliance on automation": 1, "AI capability overestimation": 1, "CLs and lack of explanations": 1, "IA making unsafe suggestions": 1, "Observability of AI progress": 1, "intelligent assistants (IAs)": 1, "system's avoidance manoeuvre": 1, "control policy learned online": 1, "highly automated environments": 1, "safety measures in CI systems": 1, "AI supporting individual goals": 1, "automation technology advances": 2, "performance visualization (C6)": 1, "AI making rare but large errors": 1, "improper integration of systems": 1, "performance visualizations (C6)": 1, "biases embedded in training data": 1, "black box nature of AI solutions": 1, "lack of explanations or feedback": 1, "opacity/black-box behavior of AI": 1, "perception ML algorithm training": 1, "programmable-logic-based control": 1, "AI-driven questions with high EIL": 1, "AI-generated reflective questions": 1, "CFFs (Cognitive Forcing Functions)": 1, "IA acting as a second pair of eyes": 1, "adaptive autonomy in cybersecurity": 1, "cognitive forcing functions (CFFs)": 1, "example-based presentation methods": 1, "interactive methods / user control": 1, "Interactive presentation frameworks": 1, "cognitive-based training approaches": 1, "textual explanations (transparency)": 1, "adaptive agents in augmented reality": 1, "implementation and deployment of IAs": 1, "AI anthropomorphism (personifying AI)": 1, "AI outputs that might surprise humans": 1, "AI serving as a decision support tool": 1, "explanation-based calibration support": 1, "human feedback through demonstrations": 1, "interconnectedness of system elements": 1, "Advisory Speed Assistance System (ASA)": 1, "human feedback and AI-driven questions": 1, "IA as a very good information collector": 1, "IA's inability to explain its rationale": 1, "IA's risk judgment based on information": 1, "Presentation and interaction approaches": 1, "explainable AI / transparency mechanisms": 2, "AI systems which tend to be 'black boxes'": 1, "automation (as a precursor to AI systems)": 1, "textual explanations (C1) and AI CLs (C3)": 1, "CAGA system's interpretation of parameters": 1, "IA reporting on human error or risk-taking": 1, "human–AI teaming in alert prioritization": 1, "performance visualizations/comparison data": 1, "regular maintenance and fine-tuning of IAs": 1, "visual explanations (C2) with moderate EIL": 1, "agent transparency (insight into reasoning)": 1, "opaque calculations, lack of explainability": 1, "reflective questions (as part of AI design)": 1, "AI becoming its own autonomous decision-maker": 1, "accurate information about AI recommendations": 1, "explaining how and why AI decisions were made": 1, "AI identity deception (pretending AI is human)": 1, "AI confidence and user reflection on confidence": 1, "encouraging critical engagement with AI outputs": 1, "model-free agents learning with trial and error": 1, "Explainable AI systems (transparency mechanisms)": 1, "generalization (implied from AI characteristics)": 1, "AI and robotics introduction in the energy sector": 1, "AI recommendations and AI-driven diagnostic tools": 1, "AI systems (generalized trust/distrust mechanism)": 1, "AI system’s performance in supporting decisions": 1, "IA giving advice without explaining its rationale": 1, "well-calibrated transparency and interpretability": 1, "AI information first, human judgment second design": 1, "AI system provides reasonably accurate suggestions": 1, "Feature-based visual methods (Grad-CAM, LIME/SHAP)": 1, "IA handling safety aspects and increasing autonomy": 1, "explicit display of correct likelihood information": 1, "textual explanations of AI decision-making process": 1, "transparency through revealing top AI recognitions": 1, "visual explanations and performance visualizations": 1, "AI influence dynamics (temporal influence patterns)": 1, "AI systems without transparency or interpretability": 1, "opaque AI (lack of explainability/black-box nature)": 1, "IA (Intelligent Automation/AI) risk judgment process": 1, "AI tools (implied as non-deterministic or unreliable)": 1, "HMM modeling of human mental model of reward function": 1, "process of reflecting on confidence and AI suggestions": 1, "AI teammate identity deception (pretending it is human)": 1, "failure to develop social capital for AI implementation": 1, "mechanisms with manageable EIL and clear reasoning cues": 1, "ISA (Intelligent Support Assistant) real-time assistance": 1, "AI tool (useful and meant to help aviation professionals)": 1, "Not applicable (no AI features mentioned in this excerpt)": 1, "visual presentation techniques (simple visual highlights)": 1, "CFF mechanisms like human feedback and AI-driven questions": 1, "Not applicable (the cause is the event, not an AI feature)": 1, "loss of AI support and inability to explain recommendations": 1, "automation that excludes human intervention or ultra-safe AI": 1, "visual explanations (C2) and performance visualizations (C6)": 1, "AI confidence levels (CLs) and making AI uncertainty explicit": 1, "AI techniques (e.g., explainability and presentation methods)": 1, "explanatory dialogs, justifications, AR-based visual guidance": 1, "increased reflection and mental effort without clear guidance": 1, "radical change in human-machine arrangements (glass cockpits)": 2, "agents designed to aid decision making in complex environments": 1, "automation (implied AI/autonomous systems from research focus)": 1, "behavior-based methods (drills, practice, part-whole training)": 1, "AI-based system autonomously allocating flights within a sector": 1, "high information density without sufficient interpretive support": 1, "reflective questions prompting deep engagement with AI decisions": 1, "visualizing past performance without direct model interpretability": 1, "expert systems failure and subsequent machine learning advancements": 1, "cooperative impedance fuzzy-controller and feedforward neural network": 1, "text explanations (XAI) to help users understand the AI’s reasoning": 1, "Interactive prediction models allowing users to adjust feature weights": 1, "Interactive frameworks enabling user engagement with AI recommendations": 1, "lack of explanation or transparency of the system’s autonomous actions": 1, "AI-driven questions (C5) and human feedback (C4) as reflective mechanisms": 1, "Explainable AI, AI recommendations aligning with users' initial judgments": 1, "AI taking on a larger share of the safety role or occupying the safety space": 1, "performance visualization / visualized comparison of human and AI performance": 1, "balanced Explanation Information Load (EIL) providing interpretable model reasoning": 1, "system Engaging with AI performance or conditions that required more cognitive effort": 1, "Explainable AI (XAI) systems' ability to provide interpretable and understandable outputs": 1, "Ability to modify importance weights of previous races in marathon finish time predictions": 1, "Real-time monitoring systems that measure human cognitive states, such as EEG-based systems": 1, "Transparency mechanisms (revealing top AI recognitions, showing correct likelihood information)": 1, "visual presentations, interactive features, uncertainty communication, simple visual highlights": 1, "automation technologies (robotic drilling systems, autonomous underwater vehicles, digital twins)": 1, "Not explicitly mentioned in the excerpt. The text discusses team dynamics, not specific AI features.": 1, "AI/autonomous system characteristics (implied from research focus, but not explicitly named in chunk)": 1, "AI-based systems as a form of highly capable automation directed at highly perceptual and cognitive tasks": 1, "IA acting as a second pair of eyes (noting safety issues, deviations, or risky actions by the human operator)": 1, "explanation mechanisms (textual explanations and AI CLs) that facilitate transparent, interpretable reasoning": 1, "Local Interpretable Model-agnostic Explanations (LIME) and SHapley Additive exPlanations (SHAP) visualizations": 1, "decision-making process lacking sufficient transparency, high cognitive effort to process decision information": 1, "Not explicitly mentioned in the excerpt. The text discusses causes of team skill decay, not specific AI features.": 1, "Feature-based visual presentations, particularly Class Activation Maps (CAMs) with traditional red-blue coloring schemes": 1, "three strategies based on estimated human and AI correctness likelihood (Direct Display, Adaptive Workflow, Adaptive Recommendation)": 1, "transparency and interpretability mechanisms (textual explanations, AI CLs) and reflective engagement mechanisms (AI-driven questions)": 1}
+performance_degradation	330	{"trust_issues": 87, "cognitive_bias": 2, "automation_bias": 25, "misinterpretation": 7, "skill_degradation": 77, "behavioral_changes": 49, "cognitive_overload": 43, "performance_metrics": 22, "situational_awareness": 18}
+\.
+
+
+--
+-- Data for Name: documents; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.documents (id, s3_key, title, author, publication_year, journal, doi, file_hash, num_pages, upload_date, processed_date, status, error_message, metadata) FROM stdin;
@@ -1980,7 +1954,7 @@ COPY public.documents (id, s3_key, title, author, publication_year, journal, doi
 
 
 --
--- Data for Name: extracted_evidence; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: extracted_evidence; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.extracted_evidence (id, chunk_id, document_id, excerpt_type, excerpt, summary, relevance_score, justification_relevance, validation_status, validation_method, validation_confidence, validated_at, metadata, created_at, updated_at) FROM stdin;
@@ -3504,7 +3478,7 @@ COPY public.extracted_evidence (id, chunk_id, document_id, excerpt_type, excerpt
 
 
 --
--- Data for Name: queries; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: queries; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.queries (id, query_text, query_hash, top_k, min_similarity, max_results, query_embedding, document_ids, chunk_ids, num_documents_retrieved, num_chunks_retrieved, similarity_scores, avg_similarity, llm_model, llm_prompt, llm_output, llm_output_tokens, llm_input_tokens, llm_total_tokens, llm_cost, llm_temperature, llm_max_tokens, created_at, completed_at) FROM stdin;
@@ -3513,35 +3487,35 @@ COPY public.queries (id, query_text, query_hash, top_k, min_similarity, max_resu
 
 
 --
--- Name: chunks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: chunks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.chunks_id_seq', 1657, true);
 
 
 --
--- Name: documents_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: documents_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.documents_id_seq', 12, true);
 
 
 --
--- Name: extracted_evidence_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: extracted_evidence_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.extracted_evidence_id_seq', 5058, true);
 
 
 --
--- Name: queries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: queries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.queries_id_seq', 1, true);
 
 
 --
--- Name: chunks chunks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: chunks chunks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.chunks
@@ -3549,7 +3523,15 @@ ALTER TABLE ONLY public.chunks
 
 
 --
--- Name: documents documents_file_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: counts counts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.counts
+    ADD CONSTRAINT counts_pkey PRIMARY KEY (excerpt_type);
+
+
+--
+-- Name: documents documents_file_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.documents
@@ -3557,7 +3539,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- Name: documents documents_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: documents documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.documents
@@ -3565,7 +3547,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- Name: documents documents_s3_key_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: documents documents_s3_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.documents
@@ -3573,7 +3555,7 @@ ALTER TABLE ONLY public.documents
 
 
 --
--- Name: extracted_evidence extracted_evidence_chunk_id_document_id_excerpt_type_excerp_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: extracted_evidence extracted_evidence_chunk_id_document_id_excerpt_type_excerp_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.extracted_evidence
@@ -3581,7 +3563,7 @@ ALTER TABLE ONLY public.extracted_evidence
 
 
 --
--- Name: extracted_evidence extracted_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: extracted_evidence extracted_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.extracted_evidence
@@ -3589,7 +3571,7 @@ ALTER TABLE ONLY public.extracted_evidence
 
 
 --
--- Name: queries queries_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: queries queries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.queries
@@ -3597,7 +3579,7 @@ ALTER TABLE ONLY public.queries
 
 
 --
--- Name: chunks unique_chunk_per_doc; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: chunks unique_chunk_per_doc; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.chunks
@@ -3605,63 +3587,63 @@ ALTER TABLE ONLY public.chunks
 
 
 --
--- Name: idx_chunks_document_id; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_chunks_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_chunks_document_id ON public.chunks USING btree (document_id);
 
 
 --
--- Name: idx_chunks_embedding; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_chunks_embedding; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_chunks_embedding ON public.chunks USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
 
 
 --
--- Name: idx_chunks_section_title; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_chunks_section_title; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_chunks_section_title ON public.chunks USING btree (section_title);
 
 
 --
--- Name: idx_chunks_word_count; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_chunks_word_count; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_chunks_word_count ON public.chunks USING btree (word_count);
 
 
 --
--- Name: idx_documents_metadata; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_documents_metadata; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_documents_metadata ON public.documents USING gin (metadata);
 
 
 --
--- Name: idx_documents_s3_key; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_documents_s3_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_documents_s3_key ON public.documents USING btree (s3_key);
 
 
 --
--- Name: idx_documents_status; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_documents_status; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_documents_status ON public.documents USING btree (status);
 
 
 --
--- Name: idx_documents_upload_date; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_documents_upload_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_documents_upload_date ON public.documents USING btree (upload_date);
 
 
 --
--- Name: chunks chunks_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: chunks chunks_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.chunks
@@ -3669,7 +3651,7 @@ ALTER TABLE ONLY public.chunks
 
 
 --
--- Name: extracted_evidence extracted_evidence_chunk_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: extracted_evidence extracted_evidence_chunk_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.extracted_evidence
@@ -3677,7 +3659,7 @@ ALTER TABLE ONLY public.extracted_evidence
 
 
 --
--- Name: extracted_evidence extracted_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: extracted_evidence extracted_evidence_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.extracted_evidence
@@ -3688,5 +3670,5 @@ ALTER TABLE ONLY public.extracted_evidence
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8mJ5fQ154wWn2wbziNgyUH64nOXbaZyyoLu0sRpWdfOT8AlyyOpBpQzHBqc2khM
+\unrestrict UBqvextmpgSYaqGacFfsnxFkDK7QMHyQKMsHsdiwG1lh5b3m0aJLb5mbwlLwT6w
 
