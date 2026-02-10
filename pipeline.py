@@ -19,7 +19,7 @@ from read_files import S3Reader
 from chunk import HybridSemanticChunker
 from vector import VectorEmbedder
 from db_writer import DatabaseWriter
-
+from domain_extractor import DocumentDomainExtractor
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -118,6 +118,25 @@ class PDFProcessingPipeline:
             
             logger.info(f"Extracted and cleaned {len(text)} characters from PDF")
             
+            # Step 2.6: Extract industry domains
+            logger.info("Step 2.6: Extracting industry domains...")
+            # Detect document structure and extract abstract + introduction
+            sections = self.chunker.detect_structure(text)
+            abstract_intro_text = ""
+            for section in sections:
+                title_lower = section['title'].lower()
+                if 'abstract' in title_lower or 'introduction' in title_lower:
+                    abstract_intro_text += section.get('text', '') + "\n\n"
+            
+            # Use abstract + intro if found, otherwise fall back to text [:10000]
+            domain_input_text = abstract_intro_text.strip() if abstract_intro_text.strip() else text[:10000]
+            logger.info(f"Using {len(domain_input_text)} characters for domain extraction")
+            
+            domain_extractor = DocumentDomainExtractor()
+            domains_result = domain_extractor.extract_domains(domain_input_text, metadata)
+            domains_list = domains_result.get('domains', [])
+            logger.info(f"Extracted {len(domains_list)} industry domains: {domains_list}")
+            
             # Step 3: Chunk the text
             logger.info("Step 3: Chunking text using hybrid semantic chunker...")
             chunks = self.chunker.chunk_text(text)
@@ -153,7 +172,8 @@ class PDFProcessingPipeline:
                     'subject': metadata.get('subject'),
                     'text_length': len(text),
                     'num_chunks': len(chunks)
-                }
+                },
+                'domains': domains_list
             }
             
             # Step 6: Write to database

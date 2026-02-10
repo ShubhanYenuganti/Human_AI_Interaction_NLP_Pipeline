@@ -25,7 +25,9 @@ class EvidenceExtractPipeline:
     GOALS = [
         'ai_features',
         'performance_degradation',
-        'causal_links'
+        'causal_links',
+        'measurables',
+        'interaction_platforms'
     ]
 
     def __init__(self,
@@ -183,6 +185,13 @@ class EvidenceExtractPipeline:
         
         logger.info(f"Document found: {doc['title']}")
         
+        # Extract document domains from domains column
+        document_domains = doc.get('domains', [])
+        if document_domains:
+            logger.info(f"Document domains: {document_domains}")
+        else:
+            logger.info("No document domains found")
+        
         chunks = self.db_writer.get_chunks_by_document(document_id)
         stats['total_chunks'] = len(chunks)
         
@@ -218,7 +227,7 @@ class EvidenceExtractPipeline:
             extraction_results = self.evidence_extractor.extract_batch(
                 chunks=chunks_to_process,
                 prompt_type=goal,
-                max_workers=self.max_workers
+                max_workers=self.max_workers,
             )
 
             stats['api_requests'] += len(extraction_results)
@@ -285,7 +294,8 @@ class EvidenceExtractPipeline:
                         document_id=document_id,
                         evidence_items=evidence_items,  # Use validated evidence_items, not original result
                         prompt_type=goal,
-                        model_used=result.get('model', 'unknown')
+                        model_used=result.get('model', 'unknown'),
+                        document_domains=document_domains
                     )
                     goal_evidence_count += saved_count
                     
@@ -355,6 +365,139 @@ class EvidenceExtractPipeline:
         
         return unextracted_chunks
     
+    def get_unprocessed_combinations(self) -> List[Dict]:
+        """
+        Get all unprocessed combinations of document_id and excerpt_type.
+        
+        Returns:
+            List of dictionaries with 'document_id' and 'goals' (list of unprocessed excerpt_types)
+        """
+        
+        logger.info("Checking for unprocessed document-goal combinations...")
+        
+        try:
+            with self.db_writer.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Get all document IDs
+                    cursor.execute("SELECT id FROM documents ORDER BY id")
+                    all_document_ids = [row[0] for row in cursor.fetchall()]
+                    
+                    if not all_document_ids:
+                        logger.warning("No documents found in database")
+                        return []
+                    
+                    logger.info(f"Found {len(all_document_ids)} documents in database")
+                    
+                    unprocessed_combinations = []
+                    
+                    for doc_id in all_document_ids:
+                        unprocessed_goals = []
+                        
+                        for goal in self.GOALS:
+                            # Check if any evidence exists for this document_id and goal
+                            cursor.execute(
+                                """
+                                SELECT COUNT(*) FROM extracted_evidence 
+                                WHERE document_id = %s AND excerpt_type = %s
+                                """,
+                                (doc_id, goal)
+                            )
+                            count = cursor.fetchone()[0]
+                            
+                            if count == 0:
+                                unprocessed_goals.append(goal)
+                        
+                        if unprocessed_goals:
+                            unprocessed_combinations.append({
+                                'document_id': doc_id,
+                                'goals': unprocessed_goals
+                            })
+                    
+                    total_combinations = sum(len(combo['goals']) for combo in unprocessed_combinations)
+                    logger.info(f"Found {total_combinations} unprocessed combinations across {len(unprocessed_combinations)} documents")
+                    
+                    return unprocessed_combinations
+                    
+        except Exception as e:
+            logger.error(f"Error getting unprocessed combinations: {e}")
+            raise e
+    
+    def extract_all_unprocessed(self) -> Dict:
+        """
+        Extract evidence for all unprocessed combinations of document_id and excerpt_type.
+        
+        Returns:
+            Statistics dictionary
+        """
+        
+        logger.info("\n" + "=" * 60)
+        logger.info("EXTRACTING EVIDENCE FOR ALL UNPROCESSED COMBINATIONS")
+        logger.info("=" * 60 + "\n")
+        
+        # Get all unprocessed combinations
+        unprocessed_combinations = self.get_unprocessed_combinations()
+        
+        if not unprocessed_combinations:
+            logger.info("✅ All documents have been processed for all goals!")
+            return {
+                'documents_processed': 0,
+                'total_chunks': 0,
+                'chunks_extracted': 0,
+                'evidence_found': 0,
+                'evidence_validated': 0,
+                'evidence_failed_validation': 0,
+                'by_goal': dict.fromkeys(self.GOALS, 0),
+                'api_requests': 0,
+                'duration': 0
+            }
+        
+        # Process each document with its unprocessed goals
+        all_stats = {
+            'documents_processed': 0,
+            'total_chunks': 0,
+            'chunks_extracted': 0,
+            'evidence_found': 0,
+            'evidence_validated': 0,
+            'evidence_failed_validation': 0,
+            'by_goal': dict.fromkeys(self.GOALS, 0),
+            'api_requests': 0,
+            'start_time': datetime.now(),
+        }
+        
+        for combo in unprocessed_combinations:
+            doc_id = combo['document_id']
+            goals = combo['goals']
+            
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Processing Document ID: {doc_id}")
+            logger.info(f"Unprocessed goals: {', '.join(goals)}")
+            logger.info(f"{'='*60}\n")
+            
+            doc_stats = self.extract_from_document(
+                document_id=doc_id,
+                goals=goals,
+                skip_extracted=True
+            )
+            
+            # Aggregate stats
+            all_stats['documents_processed'] += 1
+            all_stats['total_chunks'] += doc_stats['total_chunks']
+            all_stats['chunks_extracted'] += doc_stats['chunks_extracted']
+            all_stats['evidence_found'] += doc_stats['evidence_found']
+            all_stats['evidence_validated'] += doc_stats['evidence_validated']
+            all_stats['evidence_failed_validation'] += doc_stats['evidence_failed_validation']
+            all_stats['api_requests'] += doc_stats['api_requests']
+            
+            for goal, count in doc_stats['by_goal'].items():
+                all_stats['by_goal'][goal] += count
+        
+        all_stats['end_time'] = datetime.now()
+        all_stats['duration'] = (all_stats['end_time'] - all_stats['start_time']).total_seconds()
+        
+        self.print_statistics(all_stats)
+        
+        return all_stats
+    
     def print_statistics(self, stats: Dict) -> None:
         """
         Print pipeline statistics.
@@ -388,7 +531,8 @@ class EvidenceExtractPipeline:
 
 def main():
     """
-    Example usage of the evidence extraction pipeline
+    Main entry point for the evidence extraction pipeline.
+    By default, processes all unprocessed combinations of document_id and excerpt_type.
     """
     
     # Initialize pipeline
@@ -398,16 +542,18 @@ def main():
         max_workers=3
     )
     
-    # Example: Extract evidence for specific document IDs and goals
-    document_ids = [1,2,3,4,5,6,7,8,9,10,11,12]  # Replace with actual document IDs
-    goals = ['ai_features', 'performance_degradation', 'causal_links']
+    # Option 1: Extract evidence for ALL unprocessed combinations (DEFAULT)
+    # This will automatically find all documents and goals that haven't been processed yet
+    stats = pipeline.extract_all_unprocessed()
     
-    # Run the pipeline
-    stats = pipeline.extract_from_documents(
-        document_ids=document_ids,
-        goals=goals,
-        skip_extracted=True
-    )
+    # Option 2: Extract evidence for specific document IDs and goals (uncomment to use)
+    # document_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    # goals = ['ai_features', 'performance_degradation', 'causal_links', 'measurables', 'interaction_platforms']
+    # stats = pipeline.extract_from_documents(
+    #     document_ids=document_ids,
+    #     goals=goals,
+    #     skip_extracted=True
+    # )
     
     return stats
 

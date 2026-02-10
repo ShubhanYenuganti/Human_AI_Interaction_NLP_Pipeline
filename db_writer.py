@@ -257,7 +257,7 @@ class DatabaseWriter:
                         """
                         SELECT id, s3_key, title, author, publication_year,
                                journal, doi, file_hash, num_pages, upload_date,
-                               processed_date, status, error_message, metadata
+                               processed_date, status, error_message, metadata, domains
                         FROM documents
                         WHERE id = %s
                         """,
@@ -283,7 +283,8 @@ class DatabaseWriter:
                         'processed_date': row[10],
                         'status': row[11],
                         'error_message': row[12],
-                        'metadata': row[13]
+                        'metadata': row[13],
+                        'domains': row[14]
                     }
                     
         except Exception as e:
@@ -307,7 +308,7 @@ class DatabaseWriter:
                         """
                         SELECT id, s3_key, title, author, publication_year,
                                journal, doi, file_hash, num_pages, upload_date,
-                               processed_date, status, error_message, metadata
+                               processed_date, status, error_message, metadata, domains
                         FROM documents
                         WHERE file_hash = %s
                         """,
@@ -332,7 +333,8 @@ class DatabaseWriter:
                         'processed_date': row[10],
                         'status': row[11],
                         'error_message': row[12],
-                        'metadata': row[13]
+                        'metadata': row[13],
+                        'domains': row[14]
                     }
                     
         except Exception as e:
@@ -840,9 +842,10 @@ class DatabaseWriter:
                             file_hash,
                             num_pages,
                             status,
-                            metadata
+                            metadata,
+                            domains
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
                     
@@ -858,7 +861,8 @@ class DatabaseWriter:
                             document_metadata['file_hash'],
                             document_metadata['num_pages'],
                             document_metadata.get('status', 'pending'),
-                            Json(document_metadata.get('metadata', {}))
+                            Json(document_metadata.get('metadata', {})),
+                            Json(document_metadata.get('domains', []))
                         )
                     )
                     
@@ -1033,8 +1037,8 @@ class DatabaseWriter:
         Extract evidence items from the LLM response JSON structure
         
         Args:
-            evidence_response: The evidence JSON response from the LLM (contains 'features', 'degradations', or 'causal_links')
-            prompt_type: The type of prompt (ai_features, performance_degradation, causal_links)
+            evidence_response: The evidence JSON response from the LLM (contains 'features', 'degradations', 'causal_links', 'measurables', or 'interaction_platforms')
+            prompt_type: The type of prompt (ai_features, performance_degradation, causal_links, measurables, interaction_platforms)
         
         Returns:
             List of evidence items (only valid dictionaries)
@@ -1047,6 +1051,10 @@ class DatabaseWriter:
             raw_items = evidence_response.get('degradations', [])
         elif prompt_type == 'causal_links':
             raw_items = evidence_response.get('causal_links', [])
+        elif prompt_type == 'measurables':
+            raw_items = evidence_response.get('measurables', [])
+        elif prompt_type == 'interaction_platforms':
+            raw_items = evidence_response.get('interaction_platforms', [])
         else:
             logger.warning(f"Unknown prompt_type: {prompt_type}")
             return []
@@ -1073,7 +1081,7 @@ class DatabaseWriter:
         
         Args:
             item: The evidence item from the extraction (varies by prompt_type)
-            prompt_type: The type of prompt (ai_features, performance_degradation, causal_links)
+            prompt_type: The type of prompt (ai_features, performance_degradation, causal_links, measurables, interaction_platforms)
         
         Returns:
             Dictionary with unified structure for database insertion
@@ -1082,15 +1090,13 @@ class DatabaseWriter:
         # Base unified structure matching what prompt templates actually return
         unified = {
             'excerpt_type': prompt_type,
+            'prefix': item.get('prefix', ''),
             'excerpt': item.get('excerpt', ''),  # Word-for-word with cleaned spacing
             'summary': item.get('summary', ''),
             'relevance_score': item.get('relevance_score', 5),
             'justification_relevance': item.get('justification_relevance', ''),
-            'domain': item.get('domain', ''),
             'explanation': item.get('explanation', ''),
-            'metadata': {
-                'quote': item.get('quote', ''),  # Character-by-character exact copy stored in metadata
-            }
+            'metadata': {}
         }
         
         # Extract and process location_proof information from enhanced prompts
@@ -1120,7 +1126,8 @@ class DatabaseWriter:
                 'category': item.get('category'),
                 'feature_name': item.get('feature_name'),
                 'prompt_type': prompt_type,
-                'location_proof': location_data
+                'location_proof': location_data,
+                'quote': item.get('quote', ''),
             }
         
         elif prompt_type == 'performance_degradation':
@@ -1130,7 +1137,8 @@ class DatabaseWriter:
                 'severity': item.get('severity'),
                 'justification_severity': item.get('justification_severity'),
                 'prompt_type': prompt_type,
-                'location_proof': location_data
+                'location_proof': location_data,
+                'quote': item.get('quote', ''),
             }
         
         elif prompt_type == 'causal_links':
@@ -1140,9 +1148,36 @@ class DatabaseWriter:
                 'performance_effect': item.get('performance_effect'),
                 'causal_strength': item.get('causal_strength'),
                 'justification_causal_strength': item.get('justification_causal_strength'),
+                'ai_feature_type': item.get('ai_feature_type'),
+                'degradation_type': item.get('degradation_type'),
                 'evidence_type': item.get('evidence_type'),
                 'prompt_type': prompt_type,
-                'location_proof': location_data
+                'location_proof': location_data,
+                'quote': item.get('quote', ''),
+            }
+        
+        elif prompt_type == 'measurables':
+            unified['goal'] = f"Measurable Metric: {item.get('metric_name', 'Unknown')}"
+            unified['metadata'] = {
+                'category': item.get('category'),
+                'ai_feature': item.get('ai_feature'),
+                'degradation_type': item.get('degradation_type'),
+                'metric_name': item.get('metric_name'),
+                'measurement_method': item.get('measurement_method'),
+                'prompt_type': prompt_type,
+                'location_proof': location_data,
+                'quote': item.get('quote', ''),
+            }
+        
+        elif prompt_type == 'interaction_platforms':
+            unified['goal'] = f"Interaction Platform: {item.get('platform_name', 'Unknown')}"
+            unified['metadata'] = {
+                'category': item.get('category'),
+                'platform_name': item.get('platform_name'),
+                'platform_attributes': item.get('platform_attributes', {}),
+                'prompt_type': prompt_type,
+                'location_proof': location_data,
+                'quote': item.get('quote', ''),
             }
         
         else:
@@ -1151,7 +1186,9 @@ class DatabaseWriter:
             unified['metadata'] = {
                 'prompt_type': prompt_type,
                 'location_proof': location_data,
-                'original_item': item
+                'original_item': item,
+                'quote': item.get('quote', ''),
+                'prefix': item.get('prefix', '')
             }
         
         return unified
@@ -1161,7 +1198,8 @@ class DatabaseWriter:
                                 document_id: int,
                                 evidence_items: List[Dict],
                                 prompt_type: str,
-                                model_used: str) -> int:
+                                model_used: str,
+                                document_domains: List[str] = None) -> int:
         """
         Save extracted evidence to database for a specific chunk
         
@@ -1171,6 +1209,7 @@ class DatabaseWriter:
             evidence_items: List of evidence items to save
             prompt_type: The type of prompt used to extract the evidence
             model_used: The model used to extract the evidence
+            document_domains: List of industry domains for the document (optional)
         
         Returns:
             Number of evidence items saved
@@ -1193,17 +1232,18 @@ class DatabaseWriter:
                                 document_id,
                                 excerpt_type,
                                 excerpt,
+                                prefix,
                                 summary,
                                 explanation,
                                 relevance_score,
                                 justification_relevance,
-                                domain,
+                                document_domains,
                                 validation_status,
                                 validation_method,
                                 validation_confidence,
                                 metadata
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """
                         
@@ -1222,11 +1262,12 @@ class DatabaseWriter:
                             document_id,
                             normalized_item['excerpt_type'],
                             normalized_item['excerpt'],
+                            normalized_item['prefix'],
                             normalized_item['summary'],
                             normalized_item['explanation'],
                             normalized_item['relevance_score'],
                             normalized_item['justification_relevance'],
-                            normalized_item['domain'],
+                            Json(document_domains or []),
                             validation_status,
                             validation_method,
                             validation_confidence,

@@ -40,7 +40,7 @@ class EvidenceExtractor:
         
         Args:
             chunk_text: The text chunk to extract evidence from
-            prompt_type: The type of prompt to use (ai_features, performance_degradation, causal_links)
+            prompt_type: The type of prompt to use (ai_features, performance_degradation, causal_links, measurables, interaction_platforms)
         
         Returns:
             Dictionary containing the extracted evidence
@@ -132,7 +132,7 @@ Your response MUST be valid JSON with proper structure:
                 }
             
             # Check for expected top-level keys
-            expected_keys = ['features', 'degradations', 'causal_links']
+            expected_keys = ['features', 'degradations', 'causal_links', 'measurables', 'interaction_platforms']
             if not any(key in response_json for key in expected_keys):
                 logger.error(f"Response missing expected keys. Found: {list(response_json.keys())}")
                 return {
@@ -189,7 +189,7 @@ Your response MUST be valid JSON with proper structure:
         
         Args:
             chunks: List of text chunks to extract evidence from
-            prompt_type: The type of prompt to use (ai_features, performance_degradation, causal_links)
+            prompt_type: The type of prompt to use (ai_features, performance_degradation, causal_links, measurables, interaction_platforms)
             max_workers: Maximum number of workers to use for parallel extraction
         
         Returns:

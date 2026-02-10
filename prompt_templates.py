@@ -3,9 +3,11 @@ class PromptTemplates:
     Crafted prompts for evidence extraction and quantification.
     Each prompt is designed to extract the following specific types of evidence:
     
-    - AI Features
-    - Performance Degradation
-    - Causal Links
+    - AI Features: Examine the mechanisms by which humans interact with autonomous systems, including both workflow-level interaction and cognitive-flow processes.
+    - Performance Degradation: Examine the mechanisms by which humans interact with autonomous systems, including both workflow-level interaction and cognitive-flow processes.
+    - Causal Links: Identify the types of human performance degradation that may arise from these new AI features, in contrast with traditional systems.
+    - Measurables: Identify the measurable metrics for evaluating AI features that may degrade human performance during work, tasks, or operational activities, and explain how to use them. Examples include trust calibration indices, situation awareness scales (SAGAT, SART), cognitive workload measures (NASA-TLX, EEG-based metrics), error rate and error recovery time, latency in decision making, dependence or automation reliance indices, and transparency and explainability scores.
+    - AI-interaction platforms: Review current research to determine whether real, semi-real, or simulated human-AI interaction platforms or frameworks exist. 
     """
     
     # Concise research context (reusable across prompts)
@@ -74,8 +76,27 @@ EXAMPLES OF FORBIDDEN EXTRACTION:
 ❌ "automated decision making" (if chunk says "autonomous decision-making")
 
 JSON FORMAT WITH LOCATION PROOF (Use ONLY if features found in chunk):
-
-
+{{
+    "features": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
+            "prefix": "MUST FOLLOW THE EXACT FORMAT: AI Feature : [feature_name] : [category]"
+            "location_proof": {{
+                "starts_with": "[first 4 words of quote]",
+                "ends_with": "[last 4 words of quote]", 
+                "position": "[beginning/middle/end of chunk]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation of the excerpt]",
+            "category": "[non_deterministic/opacity/context_adaptive/automation/AI_capability/interface/feedback/adaptation/control]",
+            "feature_name": "[descriptive label of the AI feature that you have identified]", 
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this excerpt mentions an AI feature]",
+            "explanation": " MUST start with the prefix '[feature_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[feature_name] : [category] : [explanation]'. The explanation must: (1) Define the category and feature_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+        }}
+    ]
+}}
 
 CRITICAL: TWO EXTRACTION FIELDS REQUIRED:
 - "quote": Copy EVERY character exactly as it appears in the chunk (spaces, punctuation, formatting)
@@ -158,6 +179,7 @@ JSON FORMAT:
         {{
             "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
             "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
+            "prefix": "MUST FOLLOW THE EXACT FORMAT: Performance Degradation : [category]",
             "location_proof": {{
                 "starts_with": "[first 4 words of quote]",
                 "ends_with": "[last 4 words of quote]", 
@@ -170,8 +192,7 @@ JSON FORMAT:
             "justification_severity": "[severity reasoning]",
             "relevance_score": [1-10], 
             "justification_relevance": "[relevance reasoning]",
-            "explanation": "[2-4 sentence explanation: (1) What specific human performance degradation is described in the excerpt? (2) How does it relate to AI systems, particularly novel characteristics (non-deterministic, opacity, adaptive)? (3) What are the safety or operational implications in the specific domain? Base your explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge, examples, or paraphrases not in the original text]",
-            "domain": "[domain of the degradation] (e.g., nuclear energy, oil & gas, transportation, maritime, offshore, construction, etc.)"
+            "explanation": "MUST start with the prefix 'Degradation : [category]' (use the actual value from this excerpt), then a colon and space, then the explanation. Format: 'Degradation: [category] : [explanation]'. The explanation must: (1) Define the category and clarify what it means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
         }}
     ]
 }}
@@ -242,6 +263,7 @@ JSON FORMAT:
         {{
             "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
             "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
+            "prefix": "MUST FOLLOW THE EXACT FORMAT: Causal Link : [ai_feature, degradation_type, evidence_type]",
             "location_proof": {{
                 "starts_with": "[first 4 words of quote]",
                 "ends_with": "[last 4 words of quote]", 
@@ -258,8 +280,7 @@ JSON FORMAT:
             "degradation_type": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
             "relevance_score": [1-10],
             "justification_relevance": "[relevance reasoning]",
-            "explanation": "[2-4 sentence explanation: (1) What is the causal mechanism described in the excerpt (how does the AI feature cause the performance effect)? (2) Is this causation related to novel AI characteristics (non-deterministic, opacity, adaptive) vs traditional automation? (3) What are the theoretical or practical implications of this causal relationship? Base your explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge, examples, or paraphrases not in the original text]",
-            "domain": "[domain of the causal link] (e.g., nuclear energy, oil & gas, transportation, maritime, offshore, construction, etc.)"
+            "explanation": "MUST start with the prefix 'Causal Link : [ai_feature, degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: 'Causal Link: [ai_feature_type] : [explanation]'. The explanation must: (1) Define the ai_feature_type and clarify what it means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
         }}
     ]
 }}
@@ -292,4 +313,238 @@ ZERO TOLERANCE EXAMPLES:
 If you have ANY doubt about an excerpt's authenticity, exclude it completely.
 Better to return {{"causal_links": []}} than to fabricate content.
         """,
+        "measurables": """🚨 CRITICAL ANTI-HALLUCINATION INSTRUCTION 🚨
+You are a precise text extraction tool. You ONLY extract text that exists VERBATIM in the provided chunk.
+DO NOT create, invent, paraphrase, or generate ANY text.
+
+{RESEARCH_CONTEXT}
+
+TEXT CHUNK TO ANALYZE:
+{chunk_text}
+
+FORBIDDEN BEHAVIORS (Will cause rejection):
+❌ Creating text about metrics that "sounds right" but isn't in the chunk
+❌ Paraphrasing or rewording metric names or descriptions
+❌ Combining phrases from different sentences
+❌ Using general knowledge about metrics to fill gaps
+❌ Extracting fragments less than 15 words
+
+REQUIRED BEHAVIORS:
+✅ Copy text exactly as written, including punctuation
+✅ Include reference numbers [X,Y] if present  
+✅ Extract 15-80 words with complete context
+✅ Double-check every word exists in the chunk
+
+TASK: Find measurable metrics mentioned in THIS SPECIFIC CHUNK for evaluating AI features that may degrade human performance during work, tasks, or operational activities, and explain how to use them.
+
+PRIORITY SEARCH (ONLY if mentioned in chunk):
+1. Trust metrics: trust calibration indices, trust scales, trust measurement methods, over-trust/under-trust measures
+2. Situation awareness: SAGAT (Situation Awareness Global Assessment Technique), SART (Situation Awareness Rating Technique), SA measures
+3. Cognitive workload: NASA-TLX (Task Load Index), EEG-based metrics, workload scales, cognitive load measures
+4. Performance metrics: error rate, error recovery time, task completion time, accuracy measures
+5. Decision metrics: latency in decision making, decision quality, response time, reaction time
+6. Automation reliance: dependence indices, automation reliance measures, complacency metrics
+7. Transparency metrics: explainability scores, interpretability measures, transparency ratings
+8. Behavioral metrics: vigilance measures, monitoring behavior, engagement levels, interaction patterns
+9. General: evaluation frameworks, assessment methods, measurement protocols, validation approaches
+
+TWO-PASS VERIFICATION PROCESS:
+
+PASS 1 - IDENTIFICATION:
+1. READ the entire chunk slowly, sentence by sentence
+2. IDENTIFY which specific sentences mention measurable metrics
+3. MARK the exact start and end positions of relevant text
+4. DO NOT extract yet - just identify locations
+
+PASS 2 - VERIFICATION & EXTRACTION:
+5. For EACH identified location, READ that text again
+6. VERIFY the text actually discusses measurable metrics (not just general evaluation)
+7. COPY exactly 15-80 consecutive words from that location
+8. DOUBLE-CHECK: Can you point to the exact characters in the chunk?
+9. TRIPLE-CHECK: Do these words appear in this exact order in the chunk?
+10. If ANY word doesn't match perfectly, REJECT the entire excerpt
+
+EXAMPLES OF CORRECT EXTRACTION:
+✅ "Trust calibration was measured using the trust scale developed by Jian et al. (2000), which assesses appropriate reliance on automation."
+✅ "Situation awareness was assessed using SAGAT at predetermined freeze points during the simulation tasks."
+✅ "Cognitive workload was evaluated using the NASA-TLX questionnaire administered post-task."
+
+EXAMPLES OF FORBIDDEN EXTRACTION:
+❌ "Researchers measured trust levels" (if not in chunk)
+❌ "NASA Task Load Index" (if original says "NASA-TLX")
+❌ "error rates were calculated" (if chunk says "error rates were computed")
+
+JSON FORMAT WITH LOCATION PROOF (Use ONLY if metrics found in chunk):
+{{
+    "measurables": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
+            "prefix": "MUST FOLLOW THE EXACT FORMAT: Measurable : [metric_name] : [category] : [ai_feature] : [degradation_type]",
+            "location_proof": {{
+                "starts_with": "[first 4 words of quote]",
+                "ends_with": "[last 4 words of quote]", 
+                "position": "[beginning/middle/end of chunk]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation of the excerpt]",
+            "category": "[trust_metrics/situation_awareness/cognitive_workload/performance_metrics/decision_metrics/automation_reliance/transparency_metrics/behavioral_metrics/other]",
+            "ai_feature": "[specific AI feature that is being measured] if applicable, otherwise leave blank",
+            "degradation_type": "[specific degradation type that is being measured, if applicable, otherwise leave blank [trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
+            "metric_name": "[specific name of the metric, scale, or measure]",
+            "measurement_method": "[how the metric is measured/applied, if described]",
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this excerpt mentions a measurable metric]",
+            "explanation": "MUST start with the prefix '[metric_name] : [category] : [ai_feature] : [degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[metric_name] : [category] : [explanation]'. The explanation must: (1) Define the category and metric_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Explain how the metric is used or applied if that information is present in the excerpt. Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+        }}
+    ]
+}}
+
+CRITICAL: TWO EXTRACTION FIELDS REQUIRED:
+- "quote": Copy EVERY character exactly as it appears in the chunk (spaces, punctuation, formatting)
+- "excerpt": Copy the same content word-for-word but with normalized spacing for readability
+
+The "quote" field will be used for validation - it must be character-perfect.
+The "excerpt" field is for human readability and analysis.
+
+LOCATION_PROOF is MANDATORY for every excerpt. If you cannot provide accurate location proof, DO NOT include that excerpt.
+
+MANDATORY FINAL VERIFICATION (CRITICAL):
+For each excerpt you plan to include:
+1. LOCATE the exact text in the chunk above by finding the starting word
+2. COUNT the words to ensure you're copying the right amount
+3. CHECK every single word matches exactly (including punctuation)
+4. ASK YOURSELF: "If someone highlighted this excerpt in the chunk, would it be found?"
+5. If the answer is NO or MAYBE, DELETE that excerpt immediately
+
+HALLUCINATION EXAMPLES TO AVOID:
+❌ "NASA-TLX was used to measure cognitive load" (if chunk doesn't mention NASA-TLX)
+❌ "Trust was measured using Likert scales" (if chunk uses different measurement)
+❌ "Error rates were calculated as performance metrics" (general statement not in chunk)
+
+ONLY include excerpts where you can provide the EXACT character position in the chunk.
+If uncertain about ANY excerpt, return {{"measurables": []}} instead of risking hallucination.
+        """,
+        "interaction_platforms": """🚨 CRITICAL ANTI-HALLUCINATION INSTRUCTION 🚨
+You are a precise text extraction tool. You ONLY extract text that exists VERBATIM in the provided chunk.
+DO NOT create, invent, paraphrase, or generate ANY text.
+
+{RESEARCH_CONTEXT}
+
+TEXT CHUNK TO ANALYZE:
+{chunk_text}
+
+FORBIDDEN BEHAVIORS (Will cause rejection):
+❌ Creating text about platforms that "sounds right" but isn't in the chunk
+❌ Paraphrasing or rewording platform names or descriptions
+❌ Combining phrases from different sentences
+❌ Using general knowledge about platforms to fill gaps
+❌ Extracting fragments less than 15 words
+
+REQUIRED BEHAVIORS:
+✅ Copy text exactly as written, including punctuation
+✅ Include reference numbers [X,Y] if present  
+✅ Extract 15-100 words with complete context
+✅ Double-check every word exists in the chunk
+
+TASK: Find mentions of real, semi-real, or simulated human-AI interaction platforms or frameworks in THIS SPECIFIC CHUNK. These may include experimental testbeds, software tools, modeling approaches, or theoretical frameworks for studying human-autonomous system interaction.
+
+PRIORITY SEARCH (ONLY if mentioned in chunk):
+1. Platform/framework names: specific names of testbeds, simulators, software tools, frameworks
+2. Appearance & structure: physical/virtual setup, architecture, components, interface design
+3. Background: country, institution, organization, university, research group, development history
+4. Functions & capabilities: what the platform can do, features, supported tasks, use cases
+5. Operational workflow: input mechanisms, processing methods, output formats, interaction loops
+6. Topics solved: problems addressed, research questions answered, validation results
+7. Remaining challenges: limitations, open problems, technical difficulties, gaps
+8. Future plans: planned developments, roadmap, upcoming features, research directions
+9. Platform types: real testbed, semi-real simulation, virtual environment, theoretical model, hybrid approach
+
+TWO-PASS VERIFICATION PROCESS:
+
+PASS 1 - IDENTIFICATION:
+1. READ the entire chunk slowly, sentence by sentence
+2. IDENTIFY which specific sentences mention platforms/frameworks/testbeds
+3. MARK the exact start and end positions of relevant text
+4. DO NOT extract yet - just identify locations
+
+PASS 2 - VERIFICATION & EXTRACTION:
+5. For EACH identified location, READ that text again
+6. VERIFY the text actually discusses interaction platforms (not just general AI systems)
+7. COPY exactly 15-100 consecutive words from that location
+8. DOUBLE-CHECK: Can you point to the exact characters in the chunk?
+9. TRIPLE-CHECK: Do these words appear in this exact order in the chunk?
+10. If ANY word doesn't match perfectly, REJECT the entire excerpt
+
+EXAMPLES OF CORRECT EXTRACTION:
+✅ "The SHERPA testbed was developed at MIT to study human-robot collaboration in manufacturing environments, featuring a modular architecture with real-time feedback mechanisms."
+✅ "Researchers at TU Munich created the SafeAI simulator, which combines virtual reality with actual autonomous vehicle control systems to test operator interventions."
+✅ "The platform supports real-time monitoring of pilot decisions during automated flight scenarios, recording gaze tracking, response times, and manual override actions."
+
+EXAMPLES OF FORBIDDEN EXTRACTION:
+❌ "The testbed was used for human-AI studies" (if not in chunk)
+❌ "MIT developed a simulator" (if original says "researchers at MIT created a simulation environment")
+❌ "The platform enables human-robot interaction testing" (general statement not in chunk)
+
+JSON FORMAT WITH LOCATION PROOF (Use ONLY if platforms found in chunk):
+{{
+    "interaction_platforms": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy from chunk, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy from chunk, minimum 15 words, may clean spacing]",
+            "prefix": "MUST FOLLOW THE EXACT FORMAT: Interaction_platform : [platform_name] : [category]",
+            "location_proof": {{
+                "starts_with": "[first 4 words of quote]",
+                "ends_with": "[last 4 words of quote]", 
+                "position": "[beginning/middle/end of chunk]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation of the excerpt]",
+            "category": "[real_testbed/semi_real_simulation/virtual_simulation/software_tool/theoretical_framework/modeling_approach/hybrid_platform/other]",
+            "platform_name": "[specific name of the platform, framework, or testbed]",
+            "platform_attributes": {{
+                "background": "[country/institution/development history if mentioned]",
+                "functions": "[capabilities and features if described]",
+                "workflow": "[operational workflow if described]",
+                "topics_solved": "[problems addressed if mentioned]",
+                "challenges": "[remaining challenges if mentioned]",
+                "future_plans": "[development plans if mentioned]"
+            }},
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this excerpt mentions an interaction platform]",
+            "explanation": "MUST start with the prefix '[platform_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[platform_name] : [category] : [explanation]'. The explanation must: (1) Define the category and platform_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Describe any platform attributes that are mentioned in the excerpt (background, functions, workflow, etc.). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+        }}
+    ]
+}}
+
+CRITICAL: TWO EXTRACTION FIELDS REQUIRED:
+- "quote": Copy EVERY character exactly as it appears in the chunk (spaces, punctuation, formatting)
+- "excerpt": Copy the same content word-for-word but with normalized spacing for readability
+
+The "quote" field will be used for validation - it must be character-perfect.
+The "excerpt" field is for human readability and analysis.
+
+LOCATION_PROOF is MANDATORY for every excerpt. If you cannot provide accurate location proof, DO NOT include that excerpt.
+
+PLATFORM_ATTRIBUTES INSTRUCTIONS:
+- Only populate fields if that information is EXPLICITLY mentioned in the excerpt
+- Leave fields empty if not mentioned - DO NOT infer or generate
+- Each field should contain verbatim phrases from the excerpt, not summaries
+
+MANDATORY FINAL VERIFICATION (CRITICAL):
+For each excerpt you plan to include:
+1. LOCATE the exact text in the chunk above by finding the starting word
+2. COUNT the words to ensure you're copying the right amount
+3. CHECK every single word matches exactly (including punctuation)
+4. ASK YOURSELF: "If someone highlighted this excerpt in the chunk, would it be found?"
+5. If the answer is NO or MAYBE, DELETE that excerpt immediately
+
+HALLUCINATION EXAMPLES TO AVOID:
+❌ "The CARLA simulator was used for autonomous driving research" (if chunk doesn't mention CARLA)
+❌ "NASA developed the platform at Johnson Space Center" (if chunk uses different institution)
+❌ "The testbed enables real-time human-robot interaction" (general statement not in chunk)
+
+ONLY include excerpts where you can provide the EXACT character position in the chunk.
+If uncertain about ANY excerpt, return {{"interaction_platforms": []}} instead of risking hallucination.
+        """
     }

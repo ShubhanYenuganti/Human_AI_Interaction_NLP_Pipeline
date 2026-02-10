@@ -59,56 +59,36 @@ def export_evidence_to_csv(
         query = """
             SELECT 
                 d.title AS source,
-                CASE 
-                    WHEN e.excerpt_type = 'ai_features' THEN 
-                        CONCAT(
-                            'Category: ', COALESCE(e.metadata->>'category', ''), 
-                            ' | Feature: ', COALESCE(e.metadata->>'feature_name', '')
-                        )
-                    ELSE ''
-                END AS ai_features,
-                CASE 
-                    WHEN e.excerpt_type = 'performance_degradation' THEN 
-                        CONCAT(
-                            'Category: ', COALESCE(e.metadata->>'category', ''), 
-                            ' | Severity: ', COALESCE(e.metadata->>'severity', '')
-                        )
-                    ELSE ''
-                END AS performance_degradation,
-                CASE 
-                    WHEN e.excerpt_type = 'causal_links' THEN 
-                        CONCAT(
-                            'AI Feature: ', COALESCE(e.metadata->>'ai_feature', ''), 
-                            ' | Evidence Type: ', COALESCE(e.metadata->>'evidence_type', ''), 
-                            ' | Causal Strength: ', COALESCE(e.metadata->>'causal_strength', ''), 
-                            ' | Performance Effect: ', COALESCE(e.metadata->>'performance_effect', '')
-                        )
-                    ELSE ''
-                END AS causal_links,
+                COALESCE(e.prefix, '') AS prefix,
                 e.excerpt,
-                CASE 
-                    WHEN e.excerpt_type = 'performance_degradation' THEN 
-                        CONCAT(
-                            'Severity Justification: ', COALESCE(e.metadata->>'justification_severity', ''), 
-                            ' | Relevance Justification: ', COALESCE(e.justification_relevance, '')
-                        )
-                    WHEN e.excerpt_type = 'causal_links' THEN 
-                        CONCAT(
-                            'Causal Strength Justification: ', COALESCE(e.metadata->>'justification_causal_strength', ''), 
-                            ' | Relevance Justification: ', COALESCE(e.justification_relevance, '')
-                        )
-                    ELSE e.justification_relevance
-                END AS justification,
+                COALESCE(e.summary, '') AS summary,
+                COALESCE(e.justification_relevance, '') AS justification,
+                COALESCE(e.explanation, '') AS explanation,
+                COALESCE(
+                    (SELECT string_agg(domain, ', ') 
+                     FROM jsonb_array_elements_text(e.document_domains) AS domain),
+                    ''
+                ) AS industry_domain,
                 CASE 
                     WHEN e.validation_status = 'valid' THEN 'y'
                     ELSE 'n'
-                END AS validation
+                END AS validation,
+                CONCAT(
+                    'Total: ', COALESCE(ct.total_count, 0),
+                    ' | ', COALESCE(
+                        (SELECT string_agg(kv.key || ': ' || kv.value, ', ' ORDER BY kv.key)
+                         FROM jsonb_each_text(ct.category_counts) AS kv),
+                        ''
+                    )
+                ) AS counts
             FROM 
                 extracted_evidence e
             JOIN 
                 chunks c ON e.chunk_id = c.id
             JOIN 
                 documents d ON e.document_id = d.id
+            LEFT JOIN
+                counts ct ON e.excerpt_type = ct.excerpt_type
             ORDER BY 
                 d.title, e.created_at;
         """
@@ -126,12 +106,14 @@ def export_evidence_to_csv(
             # Define column headers
             headers = [
                 'Source',
-                'Your finding about AI features',
-                'Your finding about Human performance degradation types',
-                'Your finding about Causal links between them',
+                'Prefix',
                 'Excerpt',
+                'Summary',
                 'Justification',
-                'Validation (y/n)'
+                'Explanation',
+                'Industry Domain',
+                'Validation (y/n)',
+                'Counts'
             ]
             
             writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)

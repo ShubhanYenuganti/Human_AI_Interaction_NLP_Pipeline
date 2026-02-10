@@ -1,2 +1,11 @@
 # ignore all files in the .env folder
 .env
+
+# ignore Cursor project config
+.cursor
+
+# ignore Python cache
+__pycache__/
+*.py[cod]
+
+Project 2_Human-AI Interaction Safety Mechanism Analysis - Research and Coding tasks (3).pdf
