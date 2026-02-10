@@ -113,15 +113,16 @@ class EmbeddingSemanticChunker:
         
         return split_points
     
-    def chunk_text(self, text: str) -> list[dict]:
+    def chunk_text(self, text: str, overlap_percentage: float = 0.5) -> list[dict]:
         """
-        Main method: Perform semantic semantic chunking on text
+        Main method: Perform semantic semantic chunking on text with overlap
         
         Args:
             text: The text to chunk
+            overlap_percentage: Percentage of overlap between chunks (default 0.5 for 50%)
         
         Returns:
-            List of chunks with metadata
+            List of chunks with metadata including overlap information
         """
         
         # Split into sentences
@@ -133,7 +134,13 @@ class EmbeddingSemanticChunker:
                     'chunk_id': 0,
                     'text': text,
                     'sentences': sentences,
-                    'sentence_count': len(sentences)
+                    'sentence_count': len(sentences),
+                    'start_sentence': 0,
+                    'end_sentence': len(sentences) - 1,
+                    'previous_chunk_id': None,
+                    'next_chunk_id': None,
+                    'overlap_start': None,
+                    'overlap_end': None
                 }
             ]
         
@@ -143,24 +150,61 @@ class EmbeddingSemanticChunker:
         # Find split points
         split_points = self.find_valleys(similarities)
         
-        # Create chunks
+        # Create chunks with overlap
         chunks = []
         start_idx = 0
         
-        for i, split_idx in enumerate(split_points + [len(sentences)]):
-            chunk_sentences = sentences[start_idx:split_idx]
+        split_indices = split_points + [len(sentences)]
+        
+        for i, split_idx in enumerate(split_indices):
+            # Calculate overlap region
+            chunk_size = split_idx - start_idx
+            overlap_size = max(1, int(chunk_size * overlap_percentage))
+            
+            # Determine the actual end index for this chunk
+            end_idx = split_idx
+            
+            # Determine overlap boundaries for next chunk
+            if i < len(split_indices) - 1:
+                # This is not the last chunk, so include overlap
+                overlap_start_next = max(start_idx, end_idx - overlap_size)
+            else:
+                overlap_start_next = None
+            
+            chunk_sentences = sentences[start_idx:end_idx]
             
             if chunk_sentences:
+                # Determine if this chunk has overlap from previous chunk
+                overlap_start = None
+                overlap_end = None
+                
+                if i > 0:
+                    # This chunk overlaps with the previous one
+                    # The overlap region is from start_idx to the point where new content begins
+                    prev_end = split_indices[i-1] if i > 0 else 0
+                    prev_size = prev_end - (split_indices[i-2] if i > 1 else 0)
+                    prev_overlap_size = max(1, int(prev_size * overlap_percentage))
+                    overlap_start = start_idx
+                    overlap_end = min(start_idx + prev_overlap_size, end_idx)
+                
                 chunks.append({
                     'chunk_id': i,
                     'text': ' '.join(chunk_sentences),
                     'sentences': chunk_sentences,
                     'sentence_count': len(chunk_sentences),
                     'start_sentence': start_idx,
-                    'end_sentence': split_idx - 1,
-                    'avg_similarity': np.mean(similarities[start_idx:split_idx-1]) if split_idx > start_idx + 1 else 1.0
+                    'end_sentence': end_idx - 1,
+                    'avg_similarity': np.mean(similarities[start_idx:end_idx-1]) if end_idx > start_idx + 1 else 1.0,
+                    'previous_chunk_id': i - 1 if i > 0 else None,
+                    'next_chunk_id': i + 1 if i < len(split_indices) - 1 else None,
+                    'overlap_start': overlap_start,
+                    'overlap_end': overlap_end
                 })
                 
+            # Next chunk starts at overlap position
+            if overlap_start_next is not None:
+                start_idx = overlap_start_next
+            else:
                 start_idx = split_idx
                 
         return chunks
@@ -285,12 +329,13 @@ class HybridSemanticChunker:
         
         return sections
 
-    def chunk_section(self, section_text: str):
+    def chunk_section(self, section_text: str, overlap_percentage: float = 0.5):
         """
-        Chunk a single section using semantic chunking
+        Chunk a single section using semantic chunking with overlap
         
         Args:
             section_text: The text of the section to chunk
+            overlap_percentage: Percentage of overlap between chunks (default 0.5 for 50%)
         
         Returns:
             List of chunks with metadata
@@ -303,11 +348,11 @@ class HybridSemanticChunker:
             device=self.device
         )
         
-        return semantic_chunker.chunk_text(section_text)
+        return semantic_chunker.chunk_text(section_text, overlap_percentage=overlap_percentage)
     
     def merge_small_chunks(self, chunks: list[dict]):
         """
-        Merge chunks that are too small with adjacent chunks
+        Merge chunks that are too small with adjacent chunks while preserving overlap metadata
         
         Args:
             chunks: List of chunks to merge
@@ -331,7 +376,13 @@ class HybridSemanticChunker:
                     'text': current['text'] + ' ' + next_chunk['text'],
                     'sentences': current['sentences'] + next_chunk['sentences'],
                     'sentence_count': current['sentence_count'] + next_chunk['sentence_count'],
-                    'section_title': current.get('section_title', '')
+                    'section_title': current.get('section_title', ''),
+                    'start_sentence': current.get('start_sentence', 0),
+                    'end_sentence': next_chunk.get('end_sentence', 0),
+                    'previous_chunk_id': current.get('previous_chunk_id'),
+                    'next_chunk_id': next_chunk.get('next_chunk_id'),
+                    'overlap_start': current.get('overlap_start'),
+                    'overlap_end': next_chunk.get('overlap_end')
                 }
                 merged.append(merged_chunk)
                 i += 2 # skip the next chunk
@@ -343,7 +394,7 @@ class HybridSemanticChunker:
     
     def split_large_chunks(self, chunks: list[dict]):
         """
-        Split large chunks into smaller chunks
+        Split large chunks into smaller chunks with overlap
         
         Args:
             chunks: List of chunks to split
@@ -364,50 +415,61 @@ class HybridSemanticChunker:
                     device=self.device
                 )
                 
-                sub_chunks = sub_chunker.chunk_text(chunk['text'])
+                sub_chunks = sub_chunker.chunk_text(chunk['text'], overlap_percentage=0.5)
                 
                 for sub_chunk in sub_chunks:
                     sub_chunk['section_title'] = chunk.get('section_title', '')
                     result.append(sub_chunk)
                     
-        # renumber chunks
+        # renumber chunks and update relationships
         for i, chunk in enumerate(result):
             chunk['chunk_id'] = i
+            chunk['previous_chunk_id'] = i - 1 if i > 0 else None
+            chunk['next_chunk_id'] = i + 1 if i < len(result) - 1 else None
             
         return result
     
-    def chunk_text(self, text: str):
+    def chunk_text(self, text: str, overlap_percentage: float = 0.5):
         """
-        Main method to chunk text into sections and then chunks within each section
+        Main method to chunk text into sections and then chunks within each section with overlap
         
         Args:
             text: The text to chunk
+            overlap_percentage: Percentage of overlap between chunks (default 0.5 for 50%)
         
         Returns:
-            List of chunks with metadata
+            List of chunks with metadata including section headers and chunk relationships
         """
         
         sections = self.detect_structure(text)
         
         if not sections:
             # fallback to pure semantic chunking
-            return EmbeddingSemanticChunker(device=self.device).chunk_text(text)
+            return EmbeddingSemanticChunker(device=self.device).chunk_text(text, overlap_percentage=overlap_percentage)
 
         all_chunks = []
         chunk_id = 0
         
         for section in sections:
-            section_chunks = self.chunk_section(section['text'])
+            section_chunks = self.chunk_section(section['text'], overlap_percentage=overlap_percentage)
             
             for chunk in section_chunks:
                 chunk['chunk_id'] = chunk_id
                 chunk['section_title'] = section['title']
+                # Store section header as additional metadata
+                chunk['section_header'] = section['title']
                 all_chunks.append(chunk)
                 chunk_id += 1
                 
-        # Step 3
+        # Step 3: Merge and split chunks as needed
         all_chunks = self.merge_small_chunks(all_chunks)
         all_chunks = self.split_large_chunks(all_chunks)
+        
+        # Final pass: Update chunk relationships to ensure consistency
+        for i, chunk in enumerate(all_chunks):
+            chunk['chunk_id'] = i
+            chunk['previous_chunk_id'] = i - 1 if i > 0 else None
+            chunk['next_chunk_id'] = i + 1 if i < len(all_chunks) - 1 else None
         
         return all_chunks
                 

@@ -35,11 +35,10 @@ class PDFProcessingPipeline:
     """
     Main pipeline class that orchestrates the entire PDF processing workflow
     """
-    
     def __init__(self,
-                 target_chunk_size: int = 8,
-                 min_chunk_size: int = 2,
-                 max_chunk_size: int = 16,
+                 target_chunk_size: int = 30,
+                 min_chunk_size: int = 15,
+                 max_chunk_size: int = 60,
                  embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
                  batch_size: int = 16,
                  device: str = "cpu"):
