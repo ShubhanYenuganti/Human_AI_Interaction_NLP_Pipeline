@@ -34,13 +34,15 @@ class EvidenceExtractor:
         self.prompts = PromptTemplates()
         self.request_count = 0
     
-    def extract_from_chunk(self, chunk_text: str, prompt_type: str) -> dict:
+    def extract_from_chunk(self, chunk_text: str, prompt_type: str, document_context: Dict, surrounding_chunks: Dict) -> dict:
         """
         Extract evidence from a text chunk using a predefined prompt template
         
         Args:
             chunk_text: The text chunk to extract evidence from
             prompt_type: The type of prompt to use (ai_features, performance_degradation, causal_links, measurables, interaction_platforms)
+            document_context: Dictionary with 'title', 'abstract', 'domains' keys
+            surrounding_chunks: Dictionary with 'previous' and 'next' keys, each containing a dictionary with 'chunk_id' and 'text' keys
         
         Returns:
             Dictionary containing the extracted evidence
@@ -48,7 +50,12 @@ class EvidenceExtractor:
         
         prompt = self.prompts.EXTRACTION_PROMPTS[prompt_type].format(
             RESEARCH_CONTEXT=self.prompts.RESEARCH_CONTEXT,
-            chunk_text=chunk_text
+            chunk_text=chunk_text,
+            document_title=document_context.get('title', ''),
+            document_abstract=document_context.get('abstract', ''),
+            domains=document_context.get('domains', ''),
+            prev_chunk_summary=surrounding_chunks.get('previous', {}).get('text', '') if surrounding_chunks.get('previous') else '',
+            next_chunk_summary=surrounding_chunks.get('next', {}).get('text', '') if surrounding_chunks.get('next') else '',        
         )
                 
         try: 
@@ -200,7 +207,7 @@ Your response MUST be valid JSON with proper structure:
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(self.extract_from_chunk, chunk['text'], prompt_type): chunk
+                executor.submit(self.extract_from_chunk, chunk['text'], prompt_type, chunk['document_context'], chunk['surrounding_chunks']): chunk
                 for chunk in chunks
             }
             

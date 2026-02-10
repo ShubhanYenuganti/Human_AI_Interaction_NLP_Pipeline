@@ -453,21 +453,13 @@ class DatabaseWriter:
                     abstract_sections = ['abstract', 'preamble', 'introduction', 'intro']
                     abstract_text = []
                     
-                    for chunk_id, text, section_title, metadata in rows:
+                    for chunk_id, text, section_title in rows:
                         # Check if section title matches abstract/intro keywords
                         if section_title and any(
                             keyword in section_title.lower() 
                             for keyword in abstract_sections
                         ):
                             abstract_text.append(text)
-                        # Also check metadata for section_header
-                        elif metadata and isinstance(metadata, dict):
-                            section_header = metadata.get('section_header', '')
-                            if section_header and any(
-                                keyword in section_header.lower() 
-                                for keyword in abstract_sections
-                            ):
-                                abstract_text.append(text)
                     
                     # If we found abstract/intro sections, return them
                     if abstract_text:
@@ -482,14 +474,24 @@ class DatabaseWriter:
             logger.error(f"Error getting document abstract: {e}")
             raise e
         
-    def get_document_context(self, document_id: int) -> Optional[str]:
+    def get_document_context(self, document_id: int) -> Optional[Dict]:
         """
         Retrieve the context - title, abstract, domains, metadata of a document
         
         Args:
             document_id: The ID of the document to retrieve the context for
         
-        Returns: The context of the document or None if not found
+        Returns: Dictionary with document context fields or None if not found
+            {
+                'title': str,
+                'abstract': str,
+                'domains': str (comma-separated),
+                'author': str,
+                'publication_year': int,
+                'journal': str,
+                'doi': str,
+                'metadata': dict
+            }
         """
         
         try:
@@ -522,42 +524,21 @@ class DatabaseWriter:
                     # Get abstract from first chunks
                     abstract = self.get_document_abstract(document_id)
                     
-                    # Build context string
-                    context_parts = []
-                    
-                    if title:
-                        context_parts.append(f"Title: {title}")
-                    
-                    if author:
-                        context_parts.append(f"Author(s): {author}")
-                    
-                    if pub_year:
-                        context_parts.append(f"Publication Year: {pub_year}")
-                    
-                    if journal:
-                        context_parts.append(f"Journal: {journal}")
-                    
-                    if doi:
-                        context_parts.append(f"DOI: {doi}")
-                    
+                    # Format domains as comma-separated string
+                    domains_str = ""
                     if domains and isinstance(domains, list) and len(domains) > 0:
                         domains_str = ", ".join(str(d) for d in domains)
-                        context_parts.append(f"Domains: {domains_str}")
                     
-                    if abstract:
-                        context_parts.append(f"\nAbstract/Introduction:\n{abstract}")
-                    
-                    if metadata and isinstance(metadata, dict) and len(metadata) > 0:
-                        # Format metadata as key-value pairs
-                        metadata_items = [f"{k}: {v}" for k, v in metadata.items()]
-                        metadata_str = ", ".join(metadata_items)
-                        context_parts.append(f"\nMetadata: {metadata_str}")
-                    
-                    if not context_parts:
-                        logger.warning(f"No context information available for document {document_id}")
-                        return None
-                    
-                    return "\n".join(context_parts)
+                    return {
+                        'title': title or "",
+                        'abstract': abstract or "",
+                        'domains': domains_str,
+                        'author': author or "",
+                        'publication_year': pub_year,
+                        'journal': journal or "",
+                        'doi': doi or "",
+                        'metadata': metadata or {}
+                    }
                     
         except Exception as e:
             logger.error(f"Error getting document context: {e}")
@@ -1085,6 +1066,70 @@ class DatabaseWriter:
         except Exception as e:
             logger.error(f"Error in hybrid search: {e}")
             raise e
+        
+    def get_surrounding_chunks(self, chunk_id: int) -> Dict:
+        """
+        Retrieve the previous and next chunks of a chunk by chunk_id
+        
+        Args:
+            chunk_id: The ID of the chunk to retrieve the previous and next chunks for
+        
+        Returns: 
+            Dict with 'previous' and 'next' keys, each containing:
+                - 'id': chunk ID
+                - 'text': chunk text
+                - None if no previous/next chunk exists
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # First, get the current chunk's document_id and chunk_index
+                    cursor.execute("""
+                        SELECT document_id, chunk_id
+                        FROM chunks
+                        WHERE id = %s
+                    """, (chunk_id,))
+                    
+                    result = cursor.fetchone()
+                    if not result:
+                        return {'previous': None, 'next': None}
+                    
+                    document_id, chunk_id = result
+                    
+                    # Get previous chunk
+                    cursor.execute("""
+                        SELECT id, text
+                        FROM chunks
+                        WHERE document_id = %s AND chunk_id = %s
+                    """, (document_id, chunk_id - 1))
+                    
+                    prev_result = cursor.fetchone()
+                    previous_chunk = {
+                        'id': prev_result[0],
+                        'text': prev_result[1]
+                    } if prev_result else None
+                    
+                    # Get next chunk
+                    cursor.execute("""
+                        SELECT id, text
+                        FROM chunks
+                        WHERE document_id = %s AND chunk_id = %s
+                    """, (document_id, chunk_id + 1))
+                    
+                    next_result = cursor.fetchone()
+                    next_chunk = {
+                        'id': next_result[0],
+                        'text': next_result[1]
+                    } if next_result else None
+                    
+                    return {
+                        'previous': previous_chunk,
+                        'next': next_chunk
+                    }
+                    
+        except Exception as e:
+            print(f"Error retrieving surrounding chunks for chunk_id {chunk_id}: {e}")
+            return {'previous': None, 'next': None}
         
     def insert_document_with_chunks(self,
                                     document_metadata: Dict,

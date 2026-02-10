@@ -28,6 +28,21 @@ DO NOT create, invent, paraphrase, or generate ANY text.
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
 
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand terminology and scope
+✅ Use previous/next chunks to understand narrative flow and disambiguate references
+✅ Leverage context to provide richer, more informed explanations
+✅ Reference context in your "explanation" field to show how the excerpt fits into the broader document
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
+
 FORBIDDEN BEHAVIORS (Will cause rejection):
 ❌ Creating text that "sounds right" but isn't in the chunk
 ❌ Paraphrasing or rewording any part of the text
@@ -93,7 +108,7 @@ JSON FORMAT WITH LOCATION PROOF (Use ONLY if features found in chunk):
             "feature_name": "[descriptive label of the AI feature that you have identified]", 
             "relevance_score": [1-10],
             "justification_relevance": "[why this excerpt mentions an AI feature]",
-            "explanation": " MUST start with the prefix '[feature_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[feature_name] : [category] : [explanation]'. The explanation must: (1) Define the category and feature_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+            "explanation": " MUST start with the prefix '[feature_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[feature_name] : [category] : [explanation]'. The explanation must: (1) Define the category and feature_name and clarify what each means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this excerpt fits into the document's narrative, what came before/after, and how the domain context helps interpret the feature. (4) If surrounding chunks show related concepts, mention how this excerpt connects to them. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
         }}
     ]
 }}
@@ -130,6 +145,21 @@ You are extracting human performance degradations. Extract ONLY text that exists
 
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
+
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand the research setting and terminology
+✅ Use previous/next chunks to understand what led to or follows from this degradation
+✅ Leverage context to provide richer, more informed explanations of performance impacts
+✅ Reference context in your "explanation" field to show how the degradation fits into the document's narrative
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
 
 CRITICAL RULES:
 ❌ NEVER invent text about performance problems
@@ -192,7 +222,7 @@ JSON FORMAT:
             "justification_severity": "[severity reasoning]",
             "relevance_score": [1-10], 
             "justification_relevance": "[relevance reasoning]",
-            "explanation": "MUST start with the prefix 'Degradation : [category]' (use the actual value from this excerpt), then a colon and space, then the explanation. Format: 'Degradation: [category] : [explanation]'. The explanation must: (1) Define the category and clarify what it means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+            "explanation": "MUST start with the prefix 'Degradation : [category]' (use the actual value from this excerpt), then a colon and space, then the explanation. Format: 'Degradation: [category] : [explanation]'. The explanation must: (1) Define the category and clarify what it means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this degradation fits into the document's research context, what conditions or features preceded it, and how the domain context helps interpret its severity. (4) If surrounding chunks show related performance issues or causal factors, mention how this excerpt connects to them. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
         }}
     ]
 }}
@@ -225,6 +255,21 @@ Extract ONLY causal relationships that exist verbatim in this chunk.
 
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
+
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand the causal mechanisms being discussed
+✅ Use previous/next chunks to understand the full causal chain or experimental setup
+✅ Leverage context to provide richer explanations of why the causal relationship matters
+✅ Reference context in your "explanation" field to show how this causal link fits into the broader argument
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
 
 EXTREME ANTI-HALLUCINATION MEASURES:
 ❌ FORBIDDEN: Creating plausible-sounding causal statements
@@ -280,7 +325,7 @@ JSON FORMAT:
             "degradation_type": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
             "relevance_score": [1-10],
             "justification_relevance": "[relevance reasoning]",
-            "explanation": "MUST start with the prefix 'Causal Link : [ai_feature, degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: 'Causal Link: [ai_feature_type] : [explanation]'. The explanation must: (1) Define the ai_feature_type and clarify what it means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+            "explanation": "MUST start with the prefix 'Causal Link : [ai_feature, degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: 'Causal Link: [ai_feature_type] : [explanation]'. The explanation must: (1) Define the ai_feature_type and clarify what it means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this causal relationship fits into the document's research framework, what experimental setup or prior conditions led to discovering this link, and how the domain context helps interpret the causal mechanism. (4) If surrounding chunks show related causal factors or outcomes, mention how this excerpt connects to the broader causal chain. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
         }}
     ]
 }}
@@ -321,6 +366,21 @@ DO NOT create, invent, paraphrase, or generate ANY text.
 
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
+
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand the measurement methodology and research design
+✅ Use previous/next chunks to understand how metrics were applied or validated
+✅ Leverage context to provide richer explanations of metric usage and interpretation
+✅ Reference context in your "explanation" field to show how the metric fits into the evaluation framework
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
 
 FORBIDDEN BEHAVIORS (Will cause rejection):
 ❌ Creating text about metrics that "sounds right" but isn't in the chunk
@@ -395,7 +455,7 @@ JSON FORMAT WITH LOCATION PROOF (Use ONLY if metrics found in chunk):
             "measurement_method": "[how the metric is measured/applied, if described]",
             "relevance_score": [1-10],
             "justification_relevance": "[why this excerpt mentions a measurable metric]",
-            "explanation": "MUST start with the prefix '[metric_name] : [category] : [ai_feature] : [degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[metric_name] : [category] : [explanation]'. The explanation must: (1) Define the category and metric_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Explain how the metric is used or applied if that information is present in the excerpt. Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+            "explanation": "MUST start with the prefix '[metric_name] : [category] : [ai_feature] : [degradation_type]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[metric_name] : [category] : [explanation]'. The explanation must: (1) Define the category and metric_name and clarify what each means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Explain how the metric is used or applied based on information in the excerpt. (4) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this metric fits into the document's evaluation methodology, what AI features or degradations were being measured, and how the domain context helps interpret metric values. (5) If surrounding chunks show experimental setup, validation results, or related metrics, mention how this excerpt connects to the broader measurement framework. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
         }}
     ]
 }}
@@ -433,6 +493,21 @@ DO NOT create, invent, paraphrase, or generate ANY text.
 
 TEXT CHUNK TO ANALYZE:
 {chunk_text}
+
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand the platform's application domain and purpose
+✅ Use previous/next chunks to understand platform capabilities, architecture, or evaluation results
+✅ Leverage context to provide richer explanations of how the platform enables human-AI interaction research
+✅ Reference context in your "explanation" field to show how the platform fits into the document's research contribution
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
 
 FORBIDDEN BEHAVIORS (Will cause rejection):
 ❌ Creating text about platforms that "sounds right" but isn't in the chunk
@@ -512,7 +587,7 @@ JSON FORMAT WITH LOCATION PROOF (Use ONLY if platforms found in chunk):
             }},
             "relevance_score": [1-10],
             "justification_relevance": "[why this excerpt mentions an interaction platform]",
-            "explanation": "MUST start with the prefix '[platform_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[platform_name] : [category] : [explanation]'. The explanation must: (1) Define the category and platform_name and clarify what each means. (2) Where possible, quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Describe any platform attributes that are mentioned in the excerpt (background, functions, workflow, etc.). Base the explanation ONLY on information present in the extracted excerpt - DO NOT introduce external knowledge or paraphrases not in the original text.",
+            "explanation": "MUST start with the prefix '[platform_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[platform_name] : [category] : [explanation]'. The explanation must: (1) Define the category and platform_name and clarify what each means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Describe any platform attributes that are mentioned in the excerpt (background, functions, workflow, etc.). (4) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this platform fits into the document's research objectives, what research questions it addresses, and how the domain context helps interpret its significance. (5) If surrounding chunks show platform capabilities, validation results, or future developments, mention how this excerpt connects to the broader platform ecosystem. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
         }}
     ]
 }}

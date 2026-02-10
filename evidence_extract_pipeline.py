@@ -201,11 +201,16 @@ class EvidenceExtractPipeline:
         
         logger.info(f"Total chunks found: {stats['total_chunks']}")
         
+        document_context = self.db_writer.get_document_context(document_id)
+        
         for chunk in chunks:
             chunk['document_id'] = document_id
+            chunk['document_context'] = document_context
+            chunk['surrounding_chunks'] = self.db_writer.get_surrounding_chunks(chunk['chunk_id'])
         
         # Create a mapping from chunk_id to chunk for quick lookup during validation
         chunk_by_id = {chunk['chunk_id']: chunk for chunk in chunks}
+        
         
         for goal in goals:
             logger.info(f"Processing goal: {goal}")
