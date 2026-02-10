@@ -46,6 +46,24 @@ class DatabaseWriter:
         # Test connection
         self.test_connection()
     
+    @staticmethod
+    def _to_python_int(value):
+        """
+        Convert numpy int types to Python int, or return None.
+        
+        PostgreSQL's psycopg2 adapter cannot handle numpy integer types,
+        so we need to convert them to native Python ints before inserting.
+        
+        Args:
+            value: The value to convert (could be numpy.int64, int, or None)
+        
+        Returns:
+            Python int or None
+        """
+        if value is None:
+            return None
+        return int(value) if hasattr(value, 'item') else value
+    
     def test_connection(self):
         """
         Test the connection to the database
@@ -396,6 +414,154 @@ class DatabaseWriter:
         except Exception as e:
             logger.error(f"Error deleting document: {e}")
             raise e
+        
+    def get_document_abstract(self, document_id: int, max_chunks: int = 5) -> Optional[str]:
+        """
+        Retrieve the abstract/intro of a document from the first chunks
+        
+        Extracts abstract or introduction sections from the first few chunks
+        by looking for section headers like "Abstract", "Introduction", "Preamble", etc.
+        
+        Args: 
+            document_id: The ID of the document to retrieve the abstract for
+            max_chunks: Maximum number of initial chunks to search (default 5)
+        
+        Returns: The abstract/intro text of the document or returns the first two chunks fallback if no abstract section is found with a logger warning that the document found no explicit abstract section
+        """
+        
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Query first chunks ordered by chunk_id
+                    cursor.execute(
+                        """
+                        SELECT chunk_id, text, section_title
+                        FROM chunks
+                        WHERE document_id = %s
+                        ORDER BY chunk_id
+                        LIMIT %s
+                        """,
+                        (document_id, max_chunks)
+                    )
+                    
+                    rows = cursor.fetchall()
+                    if not rows:
+                        logger.warning(f"No chunks found for document {document_id}")
+                        return None
+                    
+                    # Look for abstract/intro sections
+                    abstract_sections = ['abstract', 'preamble', 'introduction', 'intro']
+                    abstract_text = []
+                    
+                    for chunk_id, text, section_title, metadata in rows:
+                        # Check if section title matches abstract/intro keywords
+                        if section_title and any(
+                            keyword in section_title.lower() 
+                            for keyword in abstract_sections
+                        ):
+                            abstract_text.append(text)
+                        # Also check metadata for section_header
+                        elif metadata and isinstance(metadata, dict):
+                            section_header = metadata.get('section_header', '')
+                            if section_header and any(
+                                keyword in section_header.lower() 
+                                for keyword in abstract_sections
+                            ):
+                                abstract_text.append(text)
+                    
+                    # If we found abstract/intro sections, return them
+                    if abstract_text:
+                        return ' '.join(abstract_text)
+                    
+                    # Fallback: return first two chunks if no explicit abstract section found
+                    logger.warning(f"No explicit abstract section found for document {document_id}, returning first two chunks as fallback")
+                    fallback_chunks = [row[1] for row in rows[:2]]  # Get text from first two chunks
+                    return ' '.join(fallback_chunks)
+                    
+        except Exception as e:
+            logger.error(f"Error getting document abstract: {e}")
+            raise e
+        
+    def get_document_context(self, document_id: int) -> Optional[str]:
+        """
+        Retrieve the context - title, abstract, domains, metadata of a document
+        
+        Args:
+            document_id: The ID of the document to retrieve the context for
+        
+        Returns: The context of the document or None if not found
+        """
+        
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Query document information
+                    cursor.execute(
+                        """
+                        SELECT 
+                            title, 
+                            author, 
+                            publication_year, 
+                            journal, 
+                            doi,
+                            domains,
+                            metadata
+                        FROM documents
+                        WHERE id = %s
+                        """,
+                        (document_id,)
+                    )
+                    
+                    row = cursor.fetchone()
+                    if not row:
+                        logger.warning(f"No document found with id {document_id}")
+                        return None
+                    
+                    title, author, pub_year, journal, doi, domains, metadata = row
+                    
+                    # Get abstract from first chunks
+                    abstract = self.get_document_abstract(document_id)
+                    
+                    # Build context string
+                    context_parts = []
+                    
+                    if title:
+                        context_parts.append(f"Title: {title}")
+                    
+                    if author:
+                        context_parts.append(f"Author(s): {author}")
+                    
+                    if pub_year:
+                        context_parts.append(f"Publication Year: {pub_year}")
+                    
+                    if journal:
+                        context_parts.append(f"Journal: {journal}")
+                    
+                    if doi:
+                        context_parts.append(f"DOI: {doi}")
+                    
+                    if domains and isinstance(domains, list) and len(domains) > 0:
+                        domains_str = ", ".join(str(d) for d in domains)
+                        context_parts.append(f"Domains: {domains_str}")
+                    
+                    if abstract:
+                        context_parts.append(f"\nAbstract/Introduction:\n{abstract}")
+                    
+                    if metadata and isinstance(metadata, dict) and len(metadata) > 0:
+                        # Format metadata as key-value pairs
+                        metadata_items = [f"{k}: {v}" for k, v in metadata.items()]
+                        metadata_str = ", ".join(metadata_items)
+                        context_parts.append(f"\nMetadata: {metadata_str}")
+                    
+                    if not context_parts:
+                        logger.warning(f"No context information available for document {document_id}")
+                        return None
+                    
+                    return "\n".join(context_parts)
+                    
+        except Exception as e:
+            logger.error(f"Error getting document context: {e}")
+            raise e
     
     def insert_chunks(self,
                       document_id: int,
@@ -407,7 +573,11 @@ class DatabaseWriter:
                       sentence_count: Optional[int] = None,
                       char_start: Optional[int] = None,
                       char_end: Optional[int] = None,
-                      metadata: Optional[Dict] = None) -> Optional[int]:
+                      metadata: Optional[Dict] = None,
+                      previous_chunk_id: Optional[int] = None,
+                      next_chunk_id: Optional[int] = None,
+                      overlap_start: Optional[int] = None,
+                      overlap_end: Optional[int] = None) -> Optional[int]:
         """
         Insert a chunk into the database
         
@@ -422,6 +592,10 @@ class DatabaseWriter:
             char_start: Optional character start
             char_end: Optional character end
             metadata: Optional metadata
+            previous_chunk_id: Optional ID of previous chunk
+            next_chunk_id: Optional ID of next chunk
+            overlap_start: Optional start of overlap region
+            overlap_end: Optional end of overlap region
         
         Returns: chunk primary key ID or None if failed
         """
@@ -447,9 +621,13 @@ class DatabaseWriter:
                             char_start,
                             char_end,
                             metadata,
-                            embedding
+                            embedding,
+                            previous_chunk_id,
+                            next_chunk_id,
+                            overlap_start,
+                            overlap_end
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
                     
@@ -465,7 +643,11 @@ class DatabaseWriter:
                             char_start,
                             char_end,
                             Json(metadata or {}),
-                            embedding_list
+                            embedding_list,
+                            self._to_python_int(previous_chunk_id),
+                            self._to_python_int(next_chunk_id),
+                            self._to_python_int(overlap_start),
+                            self._to_python_int(overlap_end)
                         )
                     )
                     
@@ -487,7 +669,7 @@ class DatabaseWriter:
         
         Args:
             document_id: The ID of the document the chunks belong to
-            chunks: List of chunks to insert
+            chunks: List of chunks to insert (with overlap metadata)
             embeddings: List of embeddings for the chunks
         
         Return: Tuple of (successful_inserts, failed_inserts)
@@ -516,7 +698,11 @@ class DatabaseWriter:
                             chunk.get('char_start'),
                             chunk.get('char_end'),
                             Json(chunk.get('metadata', {})),
-                            embedding_list
+                            embedding_list,
+                            self._to_python_int(chunk.get('previous_chunk_id')),
+                            self._to_python_int(chunk.get('next_chunk_id')),
+                            self._to_python_int(chunk.get('overlap_start')),
+                            self._to_python_int(chunk.get('overlap_end'))
                         ))
                     
                     # Execute batch insert AFTER loop
@@ -531,7 +717,11 @@ class DatabaseWriter:
                             char_start,
                             char_end,
                             metadata,
-                            embedding
+                            embedding,
+                            previous_chunk_id,
+                            next_chunk_id,
+                            overlap_start,
+                            overlap_end
                         )
                         VALUES %s
                         ON CONFLICT (document_id, chunk_id) DO NOTHING
@@ -541,7 +731,7 @@ class DatabaseWriter:
                         cursor,
                         insert_query,
                         batch_data,
-                        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)"
+                        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s, %s)"
                     )
                     
                     inserted_count = cursor.rowcount
@@ -557,22 +747,36 @@ class DatabaseWriter:
             logger.error(f"Error inserting chunk batch: {e}")
             raise e
         
-    def get_chunks_by_document(self, document_id: int) -> List[Dict]:
+    def get_chunks_by_document(self, document_id: int, context_window: int = 1) -> List[Dict]:
         """
-        Retrieve all chunks for a given document
+        Retrieve all chunks for a given document with surrounding context
         
         Args:
             document_id: The ID of the document to retrieve chunks for
+            context_window: Number of surrounding chunks to include on each side (default 1)
         
-        Returns: List of chunk dicts (without embeddings for efficiency)
+        Returns: List of chunk dicts with surrounding context (without embeddings for efficiency)
         """
         
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # Query all chunks with relationship information
                     cursor.execute(
                         """
-                        SELECT id, chunk_id, text, section_title, word_count, sentence_count, created_at
+                        SELECT 
+                            id, 
+                            chunk_id, 
+                            text, 
+                            section_title, 
+                            word_count, 
+                            sentence_count, 
+                            created_at,
+                            previous_chunk_id,
+                            next_chunk_id,
+                            overlap_start,
+                            overlap_end,
+                            metadata
                         FROM chunks
                         WHERE document_id = %s
                         ORDER BY chunk_id ASC
@@ -582,17 +786,89 @@ class DatabaseWriter:
                     
                     rows = cursor.fetchall()
                     
-                    return [
-                        {
+                    # Build a lookup dictionary for efficient context retrieval
+                    chunk_lookup = {
+                        row[1]: {  # chunk_id as key
                             'id': row[0],
                             'chunk_id': row[1],
                             'text': row[2],
                             'section_title': row[3],
                             'word_count': row[4],
                             'sentence_count': row[5],
-                            'created_at': row[6]
+                            'created_at': row[6],
+                            'previous_chunk_id': row[7],
+                            'next_chunk_id': row[8],
+                            'overlap_start': row[9],
+                            'overlap_end': row[10],
+                            'metadata': row[11]
                         } for row in rows
-                    ]
+                    }
+                    
+                    # Add surrounding context to each chunk
+                    chunks_with_context = []
+                    for row in rows:
+                        chunk = {
+                            'id': row[0],
+                            'chunk_id': row[1],
+                            'text': row[2],
+                            'section_title': row[3],
+                            'word_count': row[4],
+                            'sentence_count': row[5],
+                            'created_at': row[6],
+                            'previous_chunk_id': row[7],
+                            'next_chunk_id': row[8],
+                            'overlap_start': row[9],
+                            'overlap_end': row[10],
+                            'metadata': row[11]
+                        }
+                        
+                        # Add previous context
+                        previous_context = []
+                        current_prev_id = row[7]  # previous_chunk_id
+                        for _ in range(context_window):
+                            if current_prev_id is not None and current_prev_id in chunk_lookup:
+                                prev_chunk = chunk_lookup[current_prev_id]
+                                previous_context.insert(0, {
+                                    'chunk_id': prev_chunk['chunk_id'],
+                                    'text': prev_chunk['text'],
+                                    'section_title': prev_chunk['section_title']
+                                })
+                                current_prev_id = prev_chunk['previous_chunk_id']
+                            else:
+                                break
+                        
+                        # Add next context
+                        next_context = []
+                        current_next_id = row[8]  # next_chunk_id
+                        for _ in range(context_window):
+                            if current_next_id is not None and current_next_id in chunk_lookup:
+                                next_chunk = chunk_lookup[current_next_id]
+                                next_context.append({
+                                    'chunk_id': next_chunk['chunk_id'],
+                                    'text': next_chunk['text'],
+                                    'section_title': next_chunk['section_title']
+                                })
+                                current_next_id = next_chunk['next_chunk_id']
+                            else:
+                                break
+                        
+                        chunk['previous_context'] = previous_context
+                        chunk['next_context'] = next_context
+                        
+                        # Add combined context text for convenience
+                        context_texts = []
+                        if previous_context:
+                            context_texts.extend([pc['text'] for pc in previous_context])
+                        context_texts.append(chunk['text'])
+                        if next_context:
+                            context_texts.extend([nc['text'] for nc in next_context])
+                        
+                        chunk['text_with_context'] = ' '.join(context_texts)
+                        
+                        chunks_with_context.append(chunk)
+                    
+                    return chunks_with_context
+                    
         except Exception as e:
             logger.error(f"Error getting chunks by document: {e}")
             raise e
@@ -884,7 +1160,11 @@ class DatabaseWriter:
                             chunk.get('char_start'),
                             chunk.get('char_end'),
                             Json(chunk.get('metadata', {})),
-                            embedding_list
+                            embedding_list,
+                            self._to_python_int(chunk.get('previous_chunk_id')),
+                            self._to_python_int(chunk.get('next_chunk_id')),
+                            self._to_python_int(chunk.get('overlap_start')),
+                            self._to_python_int(chunk.get('overlap_end'))
                         ))
                     
                     # Execute batch insert AFTER loop
@@ -899,7 +1179,11 @@ class DatabaseWriter:
                             char_start,
                             char_end,
                             metadata,
-                            embedding
+                            embedding,
+                            previous_chunk_id,
+                            next_chunk_id,
+                            overlap_start,
+                            overlap_end
                         )
                         VALUES %s
                         ON CONFLICT (document_id, chunk_id) DO NOTHING
@@ -909,7 +1193,7 @@ class DatabaseWriter:
                         cursor,
                         chunk_query,
                         batch_data,
-                        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)"
+                        template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s, %s)"
                     )
                     
                     inserted_count = cursor.rowcount

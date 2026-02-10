@@ -136,10 +136,10 @@ class PDFProcessingPipeline:
             domains_list = domains_result.get('domains', [])
             logger.info(f"Extracted {len(domains_list)} industry domains: {domains_list}")
             
-            # Step 3: Chunk the text
-            logger.info("Step 3: Chunking text using hybrid semantic chunker...")
-            chunks = self.chunker.chunk_text(text)
-            logger.info(f"Created {len(chunks)} chunks")
+            # Step 3: Chunk the text with 50% overlap
+            logger.info("Step 3: Chunking text using hybrid semantic chunker with 50% overlap...")
+            chunks = self.chunker.chunk_text(text, overlap_percentage=0.5)
+            logger.info(f"Created {len(chunks)} chunks with 50% overlap between adjacent chunks")
             
             if not chunks:
                 logger.warning(f"No chunks created for {s3_key}")
@@ -322,8 +322,8 @@ class PDFProcessingPipeline:
             # (This would require adding a delete_chunks_by_document method to DatabaseWriter)
             logger.warning("Note: Old chunks are not deleted. Consider adding cascade delete or manual cleanup.")
             
-            # Re-chunk
-            chunks = self.chunker.chunk_text(text)
+            # Re-chunk with 50% overlap
+            chunks = self.chunker.chunk_text(text, overlap_percentage=0.5)
             
             # Re-embed
             chunk_texts = [chunk['text'] for chunk in chunks]
