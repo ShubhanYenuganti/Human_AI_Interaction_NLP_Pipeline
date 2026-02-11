@@ -587,7 +587,7 @@ JSON FORMAT WITH LOCATION PROOF (Use ONLY if platforms found in chunk):
             }},
             "relevance_score": [1-10],
             "justification_relevance": "[why this excerpt mentions an interaction platform]",
-            "explanation": "MUST start with the prefix '[platform_name] : [category]' (use the actual values from this excerpt), then a colon and space, then the explanation. Format: '[platform_name] : [category] : [explanation]'. The explanation must: (1) Define the category and platform_name and clarify what each means. (2) Quote or reference the original wording used in the source (use exact phrases from the excerpt in quotes). (3) Describe any platform attributes that are mentioned in the excerpt (background, functions, workflow, etc.). (4) Use the document context (title, abstract, domains) and surrounding chunks (previous/next) to provide deeper understanding - explain how this platform fits into the document's research objectives, what research questions it addresses, and how the domain context helps interpret its significance. (5) If surrounding chunks show platform capabilities, validation results, or future developments, mention how this excerpt connects to the broader platform ecosystem. Base quoted text ONLY on the extracted excerpt, but enrich your interpretation using the provided context.",
+            "explanation": "Format: '[platform_name] : [category] : [2-3 sentence explanation]'. Briefly explain: (1) what the platform is based on the excerpt, (2) its purpose or capabilities if mentioned, (3) how it relates to the document's research focus using context.",
         }}
     ]
 }}
@@ -621,5 +621,203 @@ HALLUCINATION EXAMPLES TO AVOID:
 
 ONLY include excerpts where you can provide the EXACT character position in the chunk.
 If uncertain about ANY excerpt, return {{"interaction_platforms": []}} instead of risking hallucination.
+        """,
+        
+        "consolidated": """🚨 CRITICAL ANTI-HALLUCINATION INSTRUCTION 🚨
+You are a precise text extraction tool. You ONLY extract text that exists VERBATIM in the provided chunk.
+DO NOT create, invent, paraphrase, or generate ANY text.
+
+{RESEARCH_CONTEXT}
+
+TEXT CHUNK TO ANALYZE:
+{chunk_text}
+
+DOCUMENT CONTEXT (for understanding, NOT for extraction):
+- Title: {document_title}
+- Abstract: {document_abstract}
+- Domains: {domains}
+- Previous context: {prev_chunk_summary}
+- Following context: {next_chunk_summary}
+
+HOW TO USE CONTEXT:
+✅ Use document context (title, abstract, domains) to understand terminology and scope
+✅ Use previous/next chunks to understand narrative flow and disambiguate references
+✅ Leverage context to provide richer, more informed explanations
+✅ Reference context in your "explanation" field to show how the excerpt fits into the broader document
+❌ NEVER extract text from document context or surrounding chunks - ONLY from the current chunk
+❌ NEVER quote or cite text that appears only in the context sections
+
+FORBIDDEN BEHAVIORS (Will cause rejection):
+❌ Creating text that "sounds right" but isn't in the chunk
+❌ Paraphrasing or rewording any part of the text
+❌ Combining phrases from different sentences
+❌ Using general knowledge to fill gaps
+❌ Extracting fragments less than 15 words
+
+REQUIRED BEHAVIORS:
+✅ Copy text exactly as written, including punctuation
+✅ Include reference numbers [X,Y] if present  
+✅ Extract 15-100 words with complete context
+✅ Double-check every word exists in the chunk
+
+TASK: Extract ALL FIVE types of evidence from THIS SPECIFIC CHUNK:
+
+1. AI FEATURES: Novel AI characteristics vs conventional automation (non-deterministic, opacity, context-adaptive, automation levels, AI capabilities, interfaces, feedback, control)
+
+2. PERFORMANCE DEGRADATION: Human performance issues (trust issues, automation bias, situational awareness, cognitive overload, skill degradation, misinterpretation, performance metrics)
+
+3. CAUSAL LINKS: Explicit causal relationships between AI features and human performance effects (look for "caused", "resulted in", "led to", "through", "via", "associated with")
+
+4. MEASURABLES: Metrics for evaluating AI features and degradations (trust scales, SAGAT, SART, NASA-TLX, EEG, error rates, decision latency, automation reliance, transparency scores)
+
+5. INTERACTION PLATFORMS: Real, semi-real, or simulated human-AI interaction platforms/frameworks (testbeds, simulators, software tools, modeling approaches)
+
+TWO-PASS VERIFICATION PROCESS:
+
+PASS 1 - IDENTIFICATION:
+1. READ the entire chunk slowly, sentence by sentence
+2. IDENTIFY which specific sentences mention each of the five evidence types
+3. MARK the exact start and end positions of relevant text
+4. DO NOT extract yet - just identify locations
+
+PASS 2 - VERIFICATION & EXTRACTION:
+5. For EACH identified location, READ that text again
+6. VERIFY the text actually discusses the evidence type (not just related topics)
+7. COPY exactly 15-100 consecutive words from that location
+8. DOUBLE-CHECK: Can you point to the exact characters in the chunk?
+9. TRIPLE-CHECK: Do these words appear in this exact order in the chunk?
+10. If ANY word doesn't match perfectly, REJECT the entire excerpt
+
+JSON FORMAT (Return ALL FIVE arrays, use empty arrays [] if no evidence found):
+{{
+    "features": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy, minimum 15 words, may clean spacing]",
+            "prefix": "AI Feature : [feature_name] : [category]",
+            "location_proof": {{
+                "starts_with": "[first 4 words]",
+                "ends_with": "[last 4 words]", 
+                "position": "[beginning/middle/end]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation]",
+            "category": "[non_deterministic/opacity/context_adaptive/automation/AI_capability/interface/feedback/adaptation/control]",
+            "feature_name": "[descriptive label]", 
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this mentions an AI feature]",
+            "explanation": "[feature_name] : [category] : [Define category and feature. Quote original wording. Use document context and surrounding chunks to provide deeper understanding.]"
+        }}
+    ],
+    "degradations": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy, minimum 15 words, may clean spacing]",
+            "prefix": "Performance Degradation : [category]",
+            "location_proof": {{
+                "starts_with": "[first 4 words]",
+                "ends_with": "[last 4 words]", 
+                "position": "[beginning/middle/end]",
+                "verified": true
+            }},
+            "summary": "[Your analysis]",
+            "category": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/performance_metrics/behavioral_changes]",
+            "severity": [1-10],
+            "justification_severity": "[severity reasoning]",
+            "relevance_score": [1-10], 
+            "justification_relevance": "[relevance reasoning]",
+            "explanation": "Degradation : [category] : [Define category. Quote original wording. Use context to explain how this fits into research context and domain.]"
+        }}
+    ],
+    "causal_links": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy, minimum 15 words, may clean spacing]",
+            "prefix": "Causal Link : [ai_feature, degradation_type, evidence_type]",
+            "location_proof": {{
+                "starts_with": "[first 4 words]",
+                "ends_with": "[last 4 words]", 
+                "position": "[beginning/middle/end]",
+                "verified": true
+            }},
+            "summary": "[Your analysis]", 
+            "ai_feature": "[specific AI element causing effect]",
+            "performance_effect": "[specific human performance result]",
+            "causal_strength": [1-10],
+            "justification_causal_strength": "[evidence strength]",
+            "evidence_type": "[direct/indirect/correlation/mechanism]",
+            "ai_feature_type": "[non_deterministic/opacity/context_adaptive/other]",
+            "degradation_type": "[trust_issues/automation_bias/situational_awareness/cognitive_overload/skill_degradation/misinterpretation/other]",
+            "relevance_score": [1-10],
+            "justification_relevance": "[relevance reasoning]",
+            "explanation": "Causal Link : [ai_feature_type] : [Define ai_feature_type. Quote original wording. Use context to explain causal mechanism and broader causal chain.]"
+        }}
+    ],
+    "measurables": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy, minimum 15 words, may clean spacing]",
+            "prefix": "Measurable : [metric_name] : [category] : [ai_feature] : [degradation_type]",
+            "location_proof": {{
+                "starts_with": "[first 4 words]",
+                "ends_with": "[last 4 words]", 
+                "position": "[beginning/middle/end]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation]",
+            "category": "[trust_metrics/situation_awareness/cognitive_workload/performance_metrics/decision_metrics/automation_reliance/transparency_metrics/behavioral_metrics/other]",
+            "ai_feature": "[specific AI feature being measured, if applicable]",
+            "degradation_type": "[specific degradation being measured, if applicable]",
+            "metric_name": "[specific name of metric/scale/measure]",
+            "measurement_method": "[how metric is measured/applied, if described]",
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this mentions a measurable metric]",
+            "explanation": "[metric_name] : [category] : [Define category and metric. Quote original wording. Explain how metric is used. Use context to show how metric fits into evaluation methodology.]"
+        }}
+    ],
+    "interaction_platforms": [
+        {{
+            "quote": "[CHARACTER-BY-CHARACTER exact copy, minimum 15 words]",
+            "excerpt": "[WORD-FOR-WORD copy, minimum 15 words, may clean spacing]",
+            "prefix": "Interaction_platform : [platform_name] : [category]",
+            "location_proof": {{
+                "starts_with": "[first 4 words]",
+                "ends_with": "[last 4 words]", 
+                "position": "[beginning/middle/end]",
+                "verified": true
+            }},
+            "summary": "[Your interpretation]",
+            "category": "[real_testbed/semi_real_simulation/virtual_simulation/software_tool/theoretical_framework/modeling_approach/hybrid_platform/other]",
+            "platform_name": "[specific name]",
+            "platform_attributes": {{
+                "background": "[country/institution if mentioned]",
+                "functions": "[capabilities if described]",
+                "workflow": "[operational workflow if described]",
+                "topics_solved": "[problems addressed if mentioned]",
+                "challenges": "[remaining challenges if mentioned]",
+                "future_plans": "[development plans if mentioned]"
+            }},
+            "relevance_score": [1-10],
+            "justification_relevance": "[why this mentions an interaction platform]",
+            "explanation": "[platform_name] : [category] : [What the platform is. Its purpose/capabilities. How it relates to research focus.]"
+        }}
+    ]
+}}
+
+CRITICAL REQUIREMENTS:
+1. TWO EXTRACTION FIELDS: "quote" (character-perfect) and "excerpt" (word-perfect, clean spacing)
+2. LOCATION_PROOF is MANDATORY for every excerpt
+3. Return ALL FIVE arrays (features, degradations, causal_links, measurables, interaction_platforms)
+4. Use empty arrays [] if no evidence found for a type
+5. NEVER hallucinate - extract nothing rather than fabricate anything
+
+MANDATORY FINAL VERIFICATION:
+For each excerpt:
+1. LOCATE exact text in chunk
+2. COUNT words (15-100 range)
+3. CHECK every word matches exactly
+4. If uncertain, DELETE the excerpt
+
+If you cannot guarantee 100% character-perfect matching for ANY excerpt, exclude it completely.
         """
     }

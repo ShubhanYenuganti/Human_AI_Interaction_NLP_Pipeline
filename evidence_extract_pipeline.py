@@ -33,7 +33,8 @@ class EvidenceExtractPipeline:
     def __init__(self,
                  model: str = "deepseek-chat",
                  enable_validation: bool = True,
-                 max_workers: int = 3):
+                 max_workers: int = 3,
+                 use_consolidated: bool = True):
         """
         Initialize the evidence extract pipeline.
         
@@ -41,6 +42,7 @@ class EvidenceExtractPipeline:
             model: The model to use for evidence extraction.
             enable_validation: Whether to enable validation of the evidence.
             max_workers: The maximum number of workers to use for evidence extraction.
+            use_consolidated: Whether to use consolidated extraction (single API call for all 5 prompts).
         """
         
         logger.info("=" * 60)
@@ -81,7 +83,9 @@ class EvidenceExtractPipeline:
         
         
         self.max_workers = max_workers
+        self.use_consolidated = use_consolidated
         
+        logger.info(f"Extraction mode: {'CONSOLIDATED (single API call)' if use_consolidated else 'INDIVIDUAL (5 separate API calls)'}")
         logger.info("\n" + "=" * 60)
         logger.info("EVIDENCE EXTRACT PIPELINE INITIALIZED SUCCESSFULLY!")
         logger.info("=" * 60 + "\n")
@@ -206,118 +210,208 @@ class EvidenceExtractPipeline:
         for chunk in chunks:
             chunk['document_id'] = document_id
             chunk['document_context'] = document_context
-            chunk['surrounding_chunks'] = self.db_writer.get_surrounding_chunks(chunk['chunk_id'])
+            chunk['surrounding_chunks'] = self.db_writer.get_surrounding_chunks(chunk['id'])
         
-        # Create a mapping from chunk_id to chunk for quick lookup during validation
-        chunk_by_id = {chunk['chunk_id']: chunk for chunk in chunks}
+        # Create a mapping from chunk's DB primary key (id) to chunk for quick lookup during validation
+        chunk_by_id = {chunk['id']: chunk for chunk in chunks}
         
-        
-        for goal in goals:
-            logger.info(f"Processing goal: {goal}")
+        if self.use_consolidated:
+            # CONSOLIDATED MODE: Single API call for all 5 evidence types
+            logger.info("Using CONSOLIDATED extraction mode (single API call per chunk)")
             
             chunks_to_process = chunks
             if skip_extracted:
-                chunks_to_process = self.filter_unextracted_chunks(chunks_to_process, document_id, goal)
-                
+                # Filter chunks that have been extracted for ALL goals
+                chunks_to_process = self.filter_fully_extracted_chunks(chunks_to_process, document_id, goals)
                 skipped = len(chunks) - len(chunks_to_process)
-                
-                logger.info(f"Skipped {skipped} chunks that have already been extracted for goal: {goal}")
-                
+                logger.info(f"Skipped {skipped} chunks that have already been fully extracted")
+            
             if not chunks_to_process:
-                logger.info(f"No chunks to process for goal: {goal}")
-                continue
-            
-            logger.info(f"Processing {len(chunks_to_process)} chunks for goal: {goal}")
-            
-            extraction_results = self.evidence_extractor.extract_batch(
-                chunks=chunks_to_process,
-                prompt_type=goal,
-                max_workers=self.max_workers,
-            )
-
-            stats['api_requests'] += len(extraction_results)
-            
-            goal_evidence_count = 0
-            goal_validated_count = 0
-            goal_failed_validation_count = 0
-            
-            for result in extraction_results:
-                if not result['success']:
-                    logger.error(f"Error extracting evidence for chunk {result['chunk_id']}: {result['error']}")
-                    continue
+                logger.info("No chunks to process - all have been extracted")
+            else:
+                logger.info(f"Processing {len(chunks_to_process)} chunks with consolidated extraction")
                 
-                chunk_id = result['chunk_id']
-                evidence_response = result.get('evidence', {})
+                extraction_results = self.evidence_extractor.extract_consolidated_batch(
+                    chunks=chunks_to_process,
+                    max_workers=self.max_workers,
+                )
                 
-                # Extract evidence items based on goal type
-                evidence_items = self.db_writer.extract_evidence_items_from_response(evidence_response, goal)
+                stats['api_requests'] += len(extraction_results)
                 
-                if not evidence_items:
-                    logger.debug(f"No evidence found for chunk {chunk_id} with goal {goal}")
-                    continue
-                
-                # Validate evidence if validation is enabled
-                if self.enable_validation:
-                    validated_items = []
+                # Process results for each chunk
+                for result in extraction_results:
+                    if not result['success']:
+                        logger.error(f"Error extracting evidence for chunk {result['chunk_id']}: {result['error']}")
+                        continue
                     
-                    for item in evidence_items:
-                        # Use the quote field for validation (character-by-character exact)
-                        quote = item.get('quote', '')
-                        # Also check metadata for quote (if stored there by db_writer)
-                        if not quote and 'metadata' in item:
-                            quote = item['metadata'].get('quote', '')
-                        # Fall back to excerpt if quote not available (backwards compatibility)
-                        text_to_validate = quote if quote else item.get('excerpt', '')
-                        chunk_text = chunk_by_id[chunk_id]['text']
+                    chunk_id = result['chunk_id']
+                    chunk_db_id = result['chunk_db_id']
+                    evidence_response = result.get('evidence', {})
+                    
+                    # Process each evidence type from the consolidated response
+                    for goal in goals:
+                        evidence_items = self.db_writer.extract_evidence_items_from_response(evidence_response, goal)
                         
-                        if text_to_validate:
-                            validation_result = self.validator.validate_excerpt(
-                                source_text=chunk_text,
-                                excerpt=text_to_validate
-                            )
-
-                            item['validation'] = validation_result
+                        if not evidence_items:
+                            logger.debug(f"No evidence found for chunk {chunk_id} with goal {goal}")
+                            continue
+                        
+                        # Validate evidence if validation is enabled
+                        if self.enable_validation:
+                            validated_items = []
                             
-                            if validation_result['success']:
-                                goal_validated_count += 1
-                                validated_items.append(item)
-                                # Use the chunk_id from validation result if available
-                                validated_chunk_id = validation_result.get('chunk_id')
-                                if validated_chunk_id:
-                                    chunk_id = validated_chunk_id
-                            else:
-                                goal_failed_validation_count += 1
-                                print(validation_result)
-                                logger.warning(f"Validation failed for {'quote' if quote else 'excerpt'}: {text_to_validate[:100]}... in chunk {chunk_id}")
+                            for item in evidence_items:
+                                quote = item.get('quote', '')
+                                if not quote and 'metadata' in item:
+                                    quote = item['metadata'].get('quote', '')
+                                text_to_validate = quote if quote else item.get('excerpt', '')
+                                chunk_text = chunk_by_id[chunk_db_id]['text']
+                                
+                                if text_to_validate:
+                                    validation_result = self.validator.validate_excerpt(
+                                        source_text=chunk_text,
+                                        excerpt=text_to_validate
+                                    )
+                                    
+                                    item['validation'] = validation_result
+                                    
+                                    if validation_result['success']:
+                                        stats['evidence_validated'] += 1
+                                        validated_items.append(item)
+                                    else:
+                                        stats['evidence_failed_validation'] += 1
+                                        logger.warning(f"Validation failed for {'quote' if quote else 'excerpt'}: {text_to_validate[:100]}... in chunk {chunk_id}")
+                            
+                            evidence_items = validated_items
+                        
+                        # Save evidence to database
+                        try:
+                            saved_count = self.db_writer.save_extracted_evidence(
+                                chunk_id=chunk_db_id,
+                                document_id=document_id,
+                                evidence_items=evidence_items,
+                                prompt_type=goal,
+                                model_used=result.get('model', 'unknown'),
+                                document_domains=document_domains
+                            )
+                            
+                            stats['by_goal'][goal] += saved_count
+                            stats['evidence_found'] += saved_count
+                            
+                            if saved_count > 0:
+                                logger.info(f"Saved {saved_count} evidence items for chunk {chunk_id} (goal: {goal})")
+                        
+                        except Exception as e:
+                            logger.error(f"Failed to save evidence for chunk {chunk_id}, goal {goal}: {e}")
+                            continue
+        
+        else:
+            # INDIVIDUAL MODE: Separate API call for each evidence type (original behavior)
+            logger.info("Using INDIVIDUAL extraction mode (5 separate API calls per chunk)")
+            
+            for goal in goals:
+                logger.info(f"Processing goal: {goal}")
+                
+                chunks_to_process = chunks
+                if skip_extracted:
+                    chunks_to_process = self.filter_unextracted_chunks(chunks_to_process, document_id, goal)
                     
-                    evidence_items = validated_items
+                    skipped = len(chunks) - len(chunks_to_process)
                     
-                # Save evidence to database - need to pass the validated evidence items
-                try:
-                    saved_count = self.db_writer.save_extracted_evidence(
-                        chunk_id=chunk_id,
-                        document_id=document_id,
-                        evidence_items=evidence_items,  # Use validated evidence_items, not original result
-                        prompt_type=goal,
-                        model_used=result.get('model', 'unknown'),
-                        document_domains=document_domains
-                    )
-                    goal_evidence_count += saved_count
+                    logger.info(f"Skipped {skipped} chunks that have already been extracted for goal: {goal}")
                     
-                    if saved_count > 0:
-                        logger.info(f"Saved {saved_count} evidence items for chunk {chunk_id} (goal: {goal})")
-                    
-                except Exception as e:
-                    logger.error(f"Failed to save evidence for chunk {chunk_id}: {e}")
+                if not chunks_to_process:
+                    logger.info(f"No chunks to process for goal: {goal}")
                     continue
-            
-            stats['by_goal'][goal] = goal_evidence_count
-            stats['evidence_found'] += goal_evidence_count
-            stats['evidence_validated'] += goal_validated_count
-            stats['evidence_failed_validation'] += goal_failed_validation_count
-            # Only count chunks_extracted once (not per goal) - move outside goal loop
-            
-            logger.info(f"Goal '{goal}' completed: {goal_evidence_count} evidence items saved")
+                
+                logger.info(f"Processing {len(chunks_to_process)} chunks for goal: {goal}")
+                
+                extraction_results = self.evidence_extractor.extract_batch(
+                    chunks=chunks_to_process,
+                    prompt_type=goal,
+                    max_workers=self.max_workers,
+                )
+
+                stats['api_requests'] += len(extraction_results)
+                
+                goal_evidence_count = 0
+                goal_validated_count = 0
+                goal_failed_validation_count = 0
+                
+                for result in extraction_results:
+                    if not result['success']:
+                        logger.error(f"Error extracting evidence for chunk {result['chunk_id']}: {result['error']}")
+                        continue
+                    
+                    chunk_id = result['chunk_id']  # Logical chunk_id (for logging)
+                    chunk_db_id = result['chunk_db_id']  # Database primary key (for foreign key references)
+                    evidence_response = result.get('evidence', {})
+                    
+                    # Extract evidence items based on goal type
+                    evidence_items = self.db_writer.extract_evidence_items_from_response(evidence_response, goal)
+                    
+                    if not evidence_items:
+                        logger.debug(f"No evidence found for chunk {chunk_id} with goal {goal}")
+                        continue
+                    
+                    # Validate evidence if validation is enabled
+                    if self.enable_validation:
+                        validated_items = []
+                        
+                        for item in evidence_items:
+                            # Use the quote field for validation (character-by-character exact)
+                            quote = item.get('quote', '')
+                            # Also check metadata for quote (if stored there by db_writer)
+                            if not quote and 'metadata' in item:
+                                quote = item['metadata'].get('quote', '')
+                            # Fall back to excerpt if quote not available (backwards compatibility)
+                            text_to_validate = quote if quote else item.get('excerpt', '')
+                            chunk_text = chunk_by_id[chunk_db_id]['text']
+                            
+                            if text_to_validate:
+                                validation_result = self.validator.validate_excerpt(
+                                    source_text=chunk_text,
+                                    excerpt=text_to_validate
+                                )
+
+                                item['validation'] = validation_result
+                                
+                                if validation_result['success']:
+                                    goal_validated_count += 1
+                                    validated_items.append(item)
+                                else:
+                                    goal_failed_validation_count += 1
+                                    print(validation_result)
+                                    logger.warning(f"Validation failed for {'quote' if quote else 'excerpt'}: {text_to_validate[:100]}... in chunk {chunk_id}")
+                        
+                        evidence_items = validated_items
+                        
+                    # Save evidence to database - use chunk_db_id (primary key) for foreign key reference
+                    try:
+                        saved_count = self.db_writer.save_extracted_evidence(
+                            chunk_id=chunk_db_id,
+                            document_id=document_id,
+                            evidence_items=evidence_items,  # Use validated evidence_items, not original result
+                            prompt_type=goal,
+                            model_used=result.get('model', 'unknown'),
+                            document_domains=document_domains
+                        )
+                        goal_evidence_count += saved_count
+                        
+                        if saved_count > 0:
+                            logger.info(f"Saved {saved_count} evidence items for chunk {chunk_id} (goal: {goal})")
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to save evidence for chunk {chunk_id}: {e}")
+                        continue
+                
+                stats['by_goal'][goal] = goal_evidence_count
+                stats['evidence_found'] += goal_evidence_count
+                stats['evidence_validated'] += goal_validated_count
+                stats['evidence_failed_validation'] += goal_failed_validation_count
+                # Only count chunks_extracted once (not per goal) - move outside goal loop
+                
+                logger.info(f"Goal '{goal}' completed: {goal_evidence_count} evidence items saved")
         
         # Count unique chunks that were processed for any goal
         stats['chunks_extracted'] = len(chunks)
@@ -343,7 +437,7 @@ class EvidenceExtractPipeline:
         unextracted_chunks = []
         
         for chunk in chunks:
-            chunk_id = chunk['chunk_id']
+            chunk_db_id = chunk['id']  # Database primary key (matches extracted_evidence.chunk_id FK)
             
             # Check if evidence already exists for this chunk and goal
             try:
@@ -354,17 +448,68 @@ class EvidenceExtractPipeline:
                             SELECT COUNT(*) FROM extracted_evidence 
                             WHERE chunk_id = %s AND document_id = %s AND excerpt_type = %s
                             """,
-                            (chunk_id, document_id, goal)
+                            (chunk_db_id, document_id, goal)
                         )
                         count = cursor.fetchone()[0]
                         
                         if count == 0:
                             unextracted_chunks.append(chunk)
                         else:
-                            logger.debug(f"Chunk {chunk_id} already has {count} evidence items for goal '{goal}'")
+                            logger.debug(f"Chunk {chunk['chunk_id']} (db_id={chunk_db_id}) already has {count} evidence items for goal '{goal}'")
             
             except Exception as e:
-                logger.error(f"Error checking existing evidence for chunk {chunk_id}: {e}")
+                logger.error(f"Error checking existing evidence for chunk {chunk['chunk_id']}: {e}")
+                # If error checking, include the chunk to be safe
+                unextracted_chunks.append(chunk)
+        
+        return unextracted_chunks
+    
+    def filter_fully_extracted_chunks(self, chunks: List[Dict], document_id: int, goals: List[str]) -> List[Dict]:
+        """
+        Filter chunks that have already been extracted for ALL specified goals.
+        Used in consolidated mode to avoid re-processing chunks.
+        
+        Args:
+            chunks: List of chunks to filter
+            document_id: Document ID
+            goals: List of goals to check for existing extractions
+        
+        Returns:
+            List of chunks that haven't been extracted for all goals yet
+        """
+        
+        unextracted_chunks = []
+        
+        for chunk in chunks:
+            chunk_db_id = chunk['id']
+            
+            try:
+                with self.db_writer.get_connection() as conn:
+                    with conn.cursor() as cursor:
+                        # Check if evidence exists for ALL goals
+                        all_goals_extracted = True
+                        
+                        for goal in goals:
+                            cursor.execute(
+                                """
+                                SELECT COUNT(*) FROM extracted_evidence 
+                                WHERE chunk_id = %s AND document_id = %s AND excerpt_type = %s
+                                """,
+                                (chunk_db_id, document_id, goal)
+                            )
+                            count = cursor.fetchone()[0]
+                            
+                            if count == 0:
+                                all_goals_extracted = False
+                                break
+                        
+                        if not all_goals_extracted:
+                            unextracted_chunks.append(chunk)
+                        else:
+                            logger.debug(f"Chunk {chunk['chunk_id']} (db_id={chunk_db_id}) already has evidence for all goals")
+            
+            except Exception as e:
+                logger.error(f"Error checking existing evidence for chunk {chunk['chunk_id']}: {e}")
                 # If error checking, include the chunk to be safe
                 unextracted_chunks.append(chunk)
         
@@ -540,11 +685,12 @@ def main():
     By default, processes all unprocessed combinations of document_id and excerpt_type.
     """
     
-    # Initialize pipeline
+    # Initialize pipeline with CONSOLIDATED mode (single API call for all 5 prompts)
     pipeline = EvidenceExtractPipeline(
         model="deepseek-chat",
         enable_validation=True,
-        max_workers=3
+        max_workers=3,
+        use_consolidated=True  # Set to False to use individual API calls (5x more expensive)
     )
     
     # Option 1: Extract evidence for ALL unprocessed combinations (DEFAULT)
